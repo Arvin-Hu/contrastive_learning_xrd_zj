@@ -250,12 +250,15 @@ class RegressionTrainer(ContrastiveLearningTrainer):
             peaks_x = peaks_x.to(self.device, dtype=self.dtype)
             peaks_y = peaks_y.to(self.device, dtype=self.dtype)
             peaks_mask = peaks_mask.to(self.device)
+            labels = labels.to(self.device, dtype=self.dtype)
             
             # 前向传播
             logits = self.model(peaks_x, peaks_y, peaks_mask)
             
             # 计算loss
-            loss = torch.nn.MSELoss(logits, labels)
+            loss_fn = torch.nn.MSELoss()
+            loss = loss_fn(logits.squeeze(1), labels)
+            
             total_loss += loss.item()
             batch_count += 1
         
