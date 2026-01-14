@@ -4,7 +4,7 @@
 MASTER_ADDR=${MASTER_ADDR:-"127.0.0.1"}
 MASTER_PORT=${MASTER_PORT:-$(shuf -i 20001-29999 -n 1)}
 NNODES=${WORLD_SIZE:-1}
-export CUDA_VISIBLE_DEVICES=3
+export CUDA_VISIBLE_DEVICES=2
 
 NPROC_PER_NODE=1
 
@@ -23,15 +23,12 @@ torchrun --nproc_per_node=${NPROC_PER_NODE} \
          --master_addr=${MASTER_ADDR} \
          --master_port=${MASTER_PORT} \
          --rdzv_conf timeout=6000 \
-         train.py \
-         --use_qformer True \
+         train_reg.py \
          --learning_rate 1e-4 \
-         --epochs 400 \
-         --projection_dim 64 \
+         --epochs 30 \
          --batch_size 32 \
-         --temperature 0.1 \
          --embedding_dim 256 \
-         --output_path /mnt/minio/battery/xrd/train_outputs/contrastive_learning/peak_v0
+         --output_path /mnt/minio/battery/xrd/train_outputs/xrd/formation_energy
          
          
         
