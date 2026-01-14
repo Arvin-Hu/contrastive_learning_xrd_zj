@@ -1,0 +1,7 @@
+**/__pycache__/**
+wandb/**
+*.csv
+*.cif
+*.npy
+*.faiss
+*.log
