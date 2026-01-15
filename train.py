@@ -1,5 +1,5 @@
 import numpy as np
-from model import ContrastiveLearningModel
+from models.model import ContrastiveLearningModel
 from trainer import ContrastiveLearningTrainer
 from dataset import DataAugmentation, ContrastiveLearningDataset, collate_fn
 import torch

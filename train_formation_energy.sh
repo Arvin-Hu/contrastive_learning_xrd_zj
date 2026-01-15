@@ -14,6 +14,13 @@ NODE_RANK=0
 # 总进程数（可选，通常是 NNODES * NPROC_PER_NODE）
 WORLD_SIZE=$((NNODES * NPROC_PER_NODE))
 
+<<<<<<< HEAD
+=======
+
+
+
+
+>>>>>>> c531f2bd892465a0ba7331eaf339efcdb218a320
 # Launch training
 torchrun --nproc_per_node=${NPROC_PER_NODE} \
          --master_addr=${MASTER_ADDR} \
@@ -27,7 +34,11 @@ torchrun --nproc_per_node=${NPROC_PER_NODE} \
          --output_path /mnt/minio/battery/xrd/train_outputs/xrd/formation_energy \
          --train_path /mnt/minio/battery/xrd/datasets/MP_formationenergy-QA-train.jsonl  \
          --eval_path /mnt/minio/battery/xrd/datasets/MP_formationenergy-QA-test.jsonl
+<<<<<<< HEAD
  
+=======
+         
+>>>>>>> c531f2bd892465a0ba7331eaf339efcdb218a320
          
         
          
