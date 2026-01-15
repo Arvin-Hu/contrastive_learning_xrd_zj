@@ -243,7 +243,7 @@ class RegressionTrainer(ContrastiveLearningTrainer):
         self.model.eval()
         total_loss = 0
         batch_count = 0
-        
+        label_list, pred_list = [], []
         for batch in self.val_loader:
             peaks_x, peaks_y, peaks_mask = batch['peaks_x'], batch['peaks_y'], batch['peaks_mask']
             labels = batch['labels']
@@ -261,6 +261,17 @@ class RegressionTrainer(ContrastiveLearningTrainer):
             
             total_loss += loss.item()
             batch_count += 1
+            
+            logits = logits.cpu().detach().numpy()
+            labels = labels.cpu().detach().numpy()
+            
+            label_list.extend(labels.reshape(-1).tolist())
+            pred_list.extend(logits.reshape(-1).tolist())
+            
+        
+        r2 = r2_score(np.array(label_list), np.array(pred_list))
+        mae = np.abs(np.array(label_list) - np.array(pred_list)).mean()
+        print('r2: {}, mae: {}'.format(r2, mae))
         
         avg_loss = total_loss / batch_count
         self.history['val_loss'].append(avg_loss)

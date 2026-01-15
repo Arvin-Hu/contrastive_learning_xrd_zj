@@ -1,5 +1,5 @@
 from trainer import ContrastiveLearningTrainer
-from model import ContrastiveLearningModel
+from models.model import ContrastiveLearningModel
 import torch
 from dataset import ContrastiveLearningDataset, collate_fn
 from torch.utils.data import DataLoader
@@ -13,7 +13,7 @@ if __name__ == "__main__":
         projection_dim=64,
         use_qformer=True
     )
-    model.load_state_dict(torch.load('/mnt/minio/battery/xrd/train_outputs/contrastive_learning/peak_v0/epoch_134.pth')['model_state_dict'])
+    model.load_state_dict(torch.load('/mnt/minio/battery/xrd/train_outputs/contrastive_learning/peak_v0/epoch_179.pth')['model_state_dict'])
     model.eval()  
     
     device = 'cuda:2' if torch.cuda.is_available() else 'cpu'
@@ -33,7 +33,7 @@ if __name__ == "__main__":
     
     dtype = next(model.parameters()).dtype
     progress_bar = tqdm(train_loader, desc=f'Export')
-    emb_path = '/mnt/minio/battery/xrd/datasets/contrastive_learning/peaks_v0_epoch134/'
+    emb_path = '/mnt/minio/battery/xrd/datasets/contrastive_learning/peaks_v0_epoch179/'
     if not os.path.exists(emb_path):
         os.system('mkdir -p {}'.format(os.path.join(emb_path,'xrd')))
         os.system('mkdir -p {}'.format(os.path.join(emb_path,'cif')))

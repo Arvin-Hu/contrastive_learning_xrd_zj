@@ -14,17 +14,19 @@ def train(
     epochs=30,
     num_heads=8,
     num_layers=6,
-    model_path=None
+    model_path=None,
+    train_path=None,
+    eval_path=None
 ):
     
     # 3. 创建数据集和数据加载器
     train_dataset = XRDDataset(
         xrd_path='/mnt/minio/battery/xrd/datasets/raw_data/mp_xrd',
-        json_path='/mnt/minio/battery/xrd/datasets/MP_formationenergy-QA-train.jsonl'
+        json_path=train_path
     )
     eval_dataset = XRDDataset(
         xrd_path='/mnt/minio/battery/xrd/datasets/raw_data/mp_xrd',
-        json_path='/mnt/minio/battery/xrd/datasets/MP_formationenergy-QA-test.jsonl'
+        json_path=eval_path
     )
     train_loader = DataLoader(train_dataset, batch_size=batch_size, num_workers=8, pin_memory=True, shuffle=True, collate_fn=collate_fn)
     eval_loader = DataLoader(eval_dataset, batch_size=batch_size, shuffle=True, pin_memory=True, collate_fn=collate_fn)
@@ -76,6 +78,8 @@ if __name__ == '__main__':
     parser.add_argument('--num_layers', type=int, default=6)
     parser.add_argument('--output_path', type=str)
     parser.add_argument('--model_path', type=str, default=None)
+    parser.add_argument('--train_path', type=str, default=None)
+    parser.add_argument('--eval_path', type=str, default=None)
     
     # 3. 从命令行中结构化解析参数 
     args = parser.parse_args()

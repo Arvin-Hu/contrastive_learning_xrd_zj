@@ -28,9 +28,9 @@ torchrun --nproc_per_node=${NPROC_PER_NODE} \
          --epochs 30 \
          --batch_size 32 \
          --embedding_dim 256 \
-         --output_path /mnt/minio/battery/xrd/train_outputs/xrd/formation_energy \
-         --train_path /mnt/minio/battery/xrd/datasets/MP_formationenergy-QA-train.jsonl  \
-         --eval_path /mnt/minio/battery/xrd/datasets/MP_formationenergy-QA-test.jsonl
+         --output_path /mnt/minio/battery/xrd/train_outputs/xrd/lattice_parameters \
+         --train_path /mnt/minio/battery/xrd/datasets/MP_latticeparameters-QA-train.jsonl  \
+         --eval_path /mnt/minio/battery/xrd/datasets/MP_latticeparameters-QA-test.jsonl
          
          
         
