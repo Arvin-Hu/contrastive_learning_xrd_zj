@@ -1,5 +1,5 @@
 from trainer import ContrastiveLearningTrainer
-from model import ContrastiveLearningModel
+from models.model import ContrastiveLearningModel
 import torch
 from dataset import ContrastiveLearningDataset, collate_fn
 from torch.utils.data import DataLoader
@@ -13,10 +13,10 @@ if __name__ == "__main__":
         projection_dim=64,
         use_qformer=True
     )
-    model.load_state_dict(torch.load('/mnt/public/lyy/contrastive_learning_xrd/train_output/peaks_ep50/epoch_44.pth')['model_state_dict'])
+    model.load_state_dict(torch.load('/mnt/minio/battery/xrd/train_outputs/contrastive_learning/peak_v0/epoch_179.pth')['model_state_dict'])
     model.eval()  
     
-    device = 'cuda:3' if torch.cuda.is_available() else 'cpu'
+    device = 'cuda:2' if torch.cuda.is_available() else 'cpu'
     model.to(device)
 
     
@@ -33,6 +33,10 @@ if __name__ == "__main__":
     
     dtype = next(model.parameters()).dtype
     progress_bar = tqdm(train_loader, desc=f'Export')
+    emb_path = '/mnt/minio/battery/xrd/datasets/contrastive_learning/peaks_v0_epoch179/'
+    if not os.path.exists(emb_path):
+        os.system('mkdir -p {}'.format(os.path.join(emb_path,'xrd')))
+        os.system('mkdir -p {}'.format(os.path.join(emb_path,'cif')))
     for batch in progress_bar:
         cif_input, cif_mask, peaks_x, peaks_y, peaks_mask = batch['cif_input'], batch['cif_mask'], batch['peaks_x'], batch['peaks_y'], batch['peaks_mask']
         cif_input = cif_input.to(device, dtype=dtype)
@@ -47,11 +51,11 @@ if __name__ == "__main__":
         xrd_emb = xrd_emb.cpu().detach().numpy()
         cif_emb = cif_emb.cpu().detach().numpy()
         for i, filename in enumerate(filenames):
-            xrd_out_file = os.path.join('/mnt/minio/battery/xrd/datasets/contrastive_learning/peaks_epoch44/xrd', filename.split('/')[-1].replace('.json', '.npy'))
+            xrd_out_file = os.path.join(emb_path, 'xrd', filename.split('/')[-1].replace('.json', '.npy'))
             if os.path.exists(xrd_out_file):
                 continue
             np.save(xrd_out_file, xrd_emb[i])
-            cif_out_file = os.path.join('/mnt/minio/battery/xrd/datasets/contrastive_learning/peaks_epoch44/cif', filename.split('/')[-1].replace('.json', '.npy'))
+            cif_out_file = os.path.join(emb_path, 'cif', filename.split('/')[-1].replace('.json', '.npy'))
             if os.path.exists(cif_out_file):
                 continue
             np.save(cif_out_file, cif_emb[i])

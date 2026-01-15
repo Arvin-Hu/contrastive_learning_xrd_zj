@@ -5,7 +5,7 @@ import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
 import numpy as np
 from typing import Optional, Tuple, List
-from model import ContrastiveLoss
+from models.model import ContrastiveLoss
 from tqdm import tqdm
 import os
 
@@ -28,6 +28,8 @@ def debug_memory():
         except:
             pass
     print("="*50)
+    
+    
 
 class ContrastiveLearningTrainer:
     """
@@ -142,9 +144,9 @@ class ContrastiveLearningTrainer:
     
     def train(self, num_epochs: int, save_path: Optional[str] = None):
         """训练循环"""
-        print("开始训练对比学习模型...")
+        print("开始训练...")
         
-        for epoch in range(83 ,num_epochs):
+        for epoch in range(self.start_epoch, num_epochs):
             train_loss = self.train_epoch(epoch)
             val_loss = self.validate()
             
@@ -169,18 +171,19 @@ class ContrastiveLearningTrainer:
                 self.save_model(os.path.join(save_path, f"epoch_{epoch+1}.pth"), epoch)
         
         if save_path:
-            self.save_model(os.path.join(save_path, f"final.pth"))
+            self.save_model(os.path.join(save_path, f"final.pth"), epoch)
         
         print("训练完成！")
     
-    def save_model(self, path: str, epoch: int):
+    def save_model(self, path: str, epoch: int=0):
         """保存模型"""
-        torch.save({
+        info = {
             'model_state_dict': self.model.state_dict(),
             'optimizer_state_dict': self.optimizer.state_dict(),
             'history': self.history,
             'epoch': epoch,
-        }, path)
+        }
+        torch.save(info, path)
     
     def load_model(self, path: str):
         """加载模型"""
@@ -191,3 +194,86 @@ class ContrastiveLearningTrainer:
         self.start_epoch = checkpoint['epoch']
         print('模型加载: ', path)        
         
+
+
+class RegressionTrainer(ContrastiveLearningTrainer):
+    def train_epoch(self, epoch) -> float:
+        """训练一个epoch"""
+        self.model.train()
+        total_loss = 0
+        batch_count = 0
+        
+        progress_bar = tqdm(self.train_loader, desc=f'Epoch {epoch+1}')
+        for batch in progress_bar:
+            peaks_x, peaks_y, peaks_mask = batch['peaks_x'], batch['peaks_y'], batch['peaks_mask']
+            labels = batch['labels']
+            peaks_x = peaks_x.to(self.device, dtype=self.dtype)
+            peaks_y = peaks_y.to(self.device, dtype=self.dtype)
+            peaks_mask = peaks_mask.to(self.device)
+            labels = labels.to(self.device, dtype=self.dtype)
+            
+            # 前向传播
+            logits = self.model(peaks_x, peaks_y, peaks_mask)
+            
+            # 计算loss
+            loss_fn = torch.nn.MSELoss()
+            loss = loss_fn(logits.squeeze(1), labels)
+            
+            # 反向传播
+            self.optimizer.zero_grad()
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
+            self.optimizer.step()
+            
+            batch_count += 1
+            total_loss += loss.item()
+                    
+        avg_loss = total_loss / batch_count
+        self.history['train_loss'].append(avg_loss)
+        self.history['learning_rate'].append(self.optimizer.param_groups[0]['lr'])
+        
+        return avg_loss
+    
+    @torch.no_grad()
+    def validate(self) -> Optional[float]:
+        """验证"""
+        if self.val_loader is None:
+            return None
+        
+        self.model.eval()
+        total_loss = 0
+        batch_count = 0
+        label_list, pred_list = [], []
+        for batch in self.val_loader:
+            peaks_x, peaks_y, peaks_mask = batch['peaks_x'], batch['peaks_y'], batch['peaks_mask']
+            labels = batch['labels']
+            peaks_x = peaks_x.to(self.device, dtype=self.dtype)
+            peaks_y = peaks_y.to(self.device, dtype=self.dtype)
+            peaks_mask = peaks_mask.to(self.device)
+            labels = labels.to(self.device, dtype=self.dtype)
+            
+            # 前向传播
+            logits = self.model(peaks_x, peaks_y, peaks_mask)
+            
+            # 计算loss
+            loss_fn = torch.nn.MSELoss()
+            loss = loss_fn(logits.squeeze(1), labels)
+            
+            total_loss += loss.item()
+            batch_count += 1
+            
+            logits = logits.cpu().detach().numpy()
+            labels = labels.cpu().detach().numpy()
+            
+            label_list.extend(labels.reshape(-1).tolist())
+            pred_list.extend(logits.reshape(-1).tolist())
+            
+        
+        r2 = r2_score(np.array(label_list), np.array(pred_list))
+        mae = np.abs(np.array(label_list) - np.array(pred_list)).mean()
+        print('r2: {}, mae: {}'.format(r2, mae))
+        
+        avg_loss = total_loss / batch_count
+        self.history['val_loss'].append(avg_loss)
+        
+        return avg_loss
