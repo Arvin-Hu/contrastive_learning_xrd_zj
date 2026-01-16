@@ -2,11 +2,12 @@ import faiss
 import numpy as np
 import os
 from tqdm import tqdm
+import sys
 
 if __name__ == '__main__':
-    output_dir = '/mnt/public/lyy/contrastive_learning_xrd/train_output/peaks_ep50'
+    output_dir = sys.argv[1] # /mnt/minio/battery/xrd/datasets/contrastive_learning/peaks_v0_epoch179/
     # 加载保存的向量
-    cif_emb_dir = '/mnt/minio/battery/xrd/datasets/contrastive_learning/peaks_epoch44/cif'
+    cif_emb_dir = os.path.join(output_dir,'cif')
     embeddings = []
     ids = []
     print('加载中...')
@@ -40,7 +41,7 @@ if __name__ == '__main__':
     index = faiss.read_index(os.path.join(output_dir, "embeddings_index.faiss"))
 
     # 查询
-    xrd_emb_dir = '/mnt/minio/battery/xrd/datasets/contrastive_learning/peaks_epoch44/xrd'
+    xrd_emb_dir = os.path.join(output_dir,'xrd')
     cnt = 0
     hit_cnt =0
     for filename in os.listdir(xrd_emb_dir):
@@ -48,7 +49,7 @@ if __name__ == '__main__':
             query_vector = np.load(os.path.join(xrd_emb_dir, filename))
             if len(query_vector.shape) == 1:
                 query_vector = query_vector.reshape(1, -1)
-            k = 10  # 返回top10chang shichangshi
+            k = 10  # 返回top10
             distances, indices = index.search(query_vector, k)
             qid = int(filename.replace('mp-', '').replace('.npy', ''))
             if qid in indices:

@@ -6,7 +6,7 @@ from torch.utils.data import Dataset, DataLoader
 import numpy as np
 from typing import Optional, Tuple, List
 from torch import Tensor
-from qformer import QFormer
+from models.qformer import QFormer
 
 
 class XRDInputEncoder(nn.Module):
