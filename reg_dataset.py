@@ -11,7 +11,7 @@ import re
 
 
 
-def collate_fn(batch_data): 
+def collate_fn(batch_data):
     # 获取最大长度
     batch_size = len(batch_data)
     peak_max_len = max([n['peaks_n'].item() for n in batch_data])
@@ -30,17 +30,17 @@ def collate_fn(batch_data):
         xrd_tensors.append(xrd_tensor)
         filenames.append(filename)
         labels.append(data['label'])
-        
+
         peak_seq_len = peaks_n.item()
         if peak_seq_len > 0:
             peaks_x_padded_batch[i, :peak_seq_len] = peaks_x[:peak_seq_len]
             peaks_y_padded_batch[i, :peak_seq_len] = peaks_y[:peak_seq_len]
             peaks_mask[i, :peak_seq_len] = False
-    
+
     xrd_input_batch = torch.stack(xrd_tensors, dim=0)
     labels_batch = torch.stack(labels, dim=0)
-    
-    
+
+
     return {'xrd_input': xrd_input_batch, 'xrd_filename': filenames, 'peaks_x': peaks_x_padded_batch, 'peaks_y': peaks_y_padded_batch, 'peaks_mask': peaks_mask, 'labels': labels_batch}
 
 def get_peaks(y):
@@ -48,7 +48,7 @@ def get_peaks(y):
     end = 80
     points_per_interval = 50
     # 计算总点数（75个区间，每个区间50个点，加上最后一个端点）
-    total_points = (end - start) * points_per_interval 
+    total_points = (end - start) * points_per_interval
     angels = np.linspace(start, end, total_points) / 100
     peaks = find_peaks(y, height=0.01, prominence=0.02)[0]
     peak_x = angels[peaks]
@@ -57,54 +57,76 @@ def get_peaks(y):
     return peaks, peak_x, peak_y, peak_n
 
 class XRDDataset(Dataset):
-    def __init__(self, 
+    def __init__(self,
                  xrd_path: str,
                  json_path: str,
+                 label_to_extract="formation_energy"
                  ):
         print('start init dataset')
         xrd_files = []
         labels = []
-        pattern = r"[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?"
+
+        if label_to_extract == "formation_energy":
+            pattern = r"[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?"
+            self.label_type = 0.0   # a float to record that we care the energy
+        elif label_to_extract == "crystal_system":
+            pattern = r"belongs to (\w+) system"
+            csdict = {"triclinic": 0.0,
+                      "monoclinic": 1.0,
+                      "orthorhombic": 2.0,
+                      "tetragonal": 3.0,
+                      "trigonal": 4.0,
+                      "hexagonal": 5.0,
+                      "cubic": 6.0}  # dictionary to map crystal string to float
+            self.label_type = 1.0   # a float to record that we care the crystal
+        else:
+            raise ValueError("label_to_extract should be 'formation_energy' or 'crystal_system'!")
+
         with open(json_path, 'r') as f:
             for line in f:
                 try:
                     data = json.loads(line)
                     filename = data['xrd']
                     xrd_files.append(os.path.join(xrd_path, filename))
-                    labels.append(float(re.findall(pattern, data["conversations"][1]["value"])[0]))
+                    match = re.findall(pattern, data["conversations"][1]["value"])
+                    if label_to_extract == "formation_energy":
+                        labels.append(float(match[0]))  # energy -> float
+                    elif label_to_extract == "crystal_system":
+                        assert match[0] in csdict, f"{match[0]} is not a legal crystal system!"  # check indeed crystal
+                        labels.append(csdict(match[0])) # crystal string -> float
                 except:
                     print('Error skip line')
                     continue
-        
-        self.xrd_files = np.array(xrd_files)
-        self.labels = np.array(labels)
-        print('finish init dataset, dataset size: {}'.format(len(self.xrd_files)))
-        
+
+        self.xrd_files = np.array(xrd_files)    # list of strings -> np array of strings
+        self.labels = np.array(labels)          # list of floats -> np array of floats
+        print(f'finish init dataset, dataset size: {len(self.xrd_files)}')
+
     def __len__(self):
         return len(self.xrd_files)
-    
+
     def __getitem__(self, idx):
         xrd_emb, peaks_x, peaks_y, peaks_n = self.get_xrd_embeddings(self.xrd_files[idx])
         label = torch.tensor(self.labels[idx], dtype=torch.float32)
         return {'xrd_input': xrd_emb, 'xrd_file': self.xrd_files[idx], 'peaks_x': peaks_x, 'peaks_y': peaks_y, 'peaks_n': peaks_n, 'label': label}
-    
+
     def get_xrd_embeddings(self, xrd_path):
         with open(xrd_path, 'r') as f:
             data = json.load(f)
         y = np.array(data['intensity'])
-        y = (y - np.min(y)) / (np.max(y) - np.min(y))   
-        
+        y = (y - np.min(y)) / (np.max(y) - np.min(y))
+
         peaks, peaks_x, peaks_y, peaks_n = get_peaks(y)
         peaks_x = torch.tensor(np.array(peaks_x), dtype=torch.float32)
         peaks_y = torch.tensor(np.array(peaks_y), dtype=torch.float32)
         peaks_n = torch.tensor(peaks_n, dtype=torch.long)
         embeddings = torch.tensor(np.array(data['intensity']), dtype=torch.float32)
-        
-        return embeddings, peaks_x, peaks_y, peaks_n
-    
 
-    
-    
+        return embeddings, peaks_x, peaks_y, peaks_n
+
+
+
+
 if __name__ == '__main__':
     from torch.utils.data import DataLoader
     from models.reg_model import XRDRegressionModel

@@ -7,42 +7,43 @@ from torch.utils.data import DataLoader
 
 def train(
     output_path,
-    batch_size=128, 
-    learning_rate=1e-4, 
-    weight_decay=1e-4, 
-    embedding_dim=256, 
+    batch_size=128,
+    learning_rate=1e-4,
+    weight_decay=1e-4,
+    embedding_dim=256,
     epochs=30,
     num_heads=8,
     num_layers=6,
     model_path=None,
     train_path=None,
-    eval_path=None
+    eval_path=None,
+    label_to_extract="formation_energy" # can set to "crystal_system"
 ):
-    
+
     # 3. 创建数据集和数据加载器
     train_dataset = XRDDataset(
         xrd_path='/mnt/minio/battery/xrd/datasets/raw_data/mp_xrd',
-        json_path=train_path
+        json_path=train_path, label_to_extract=label_to_extract
     )
     eval_dataset = XRDDataset(
         xrd_path='/mnt/minio/battery/xrd/datasets/raw_data/mp_xrd',
-        json_path=eval_path
+        json_path=eval_path, label_to_extract=label_to_extract
     )
     train_loader = DataLoader(train_dataset, batch_size=batch_size, num_workers=8, pin_memory=True, shuffle=True, collate_fn=collate_fn)
     eval_loader = DataLoader(eval_dataset, batch_size=batch_size, shuffle=True, pin_memory=True, collate_fn=collate_fn)
-    
+
     # 4. 初始化模型
     model = XRDRegressionModel(
         embedding_dim=embedding_dim,
     )
     model = model.to(dtype=torch.float32)
-    
+
     print(f"可训练参数: {sum(p.numel() for p in model.parameters() if p.requires_grad)}")
     # for name, param in model.named_parameters():
-    #     if param.requires_grad:  
+    #     if param.requires_grad:
     #         print(f"名称: {name}, 形状: {param.shape}")
 
-    
+
     # 5. 创建训练器并训练
     trainer = RegressionTrainer(
         model=model,
@@ -53,21 +54,21 @@ def train(
     )
     if model_path:
         trainer.load_model(model_path)
-    
+
     # 6. 训练模型
     trainer.train(num_epochs=epochs, save_path=output_path)
-    
+
     # 7. 使用训练好的模型获取embedding
     # test_data = torch.randn(10, input_dim)
     # embeddings = model.encode(test_data)
     # print(f"生成的embedding形状: {embeddings.shape}")
-    
+
 if __name__ == '__main__':
     import argparse
-    
+
     # 1. 定义命令行解析器对象
     parser = argparse.ArgumentParser()
-    
+
     # 2. 添加命令行参数
     parser.add_argument('--epochs', type=int, default=30)
     parser.add_argument('--batch_size', type=int, default=4)
@@ -80,8 +81,9 @@ if __name__ == '__main__':
     parser.add_argument('--model_path', type=str, default=None)
     parser.add_argument('--train_path', type=str, default=None)
     parser.add_argument('--eval_path', type=str, default=None)
-    
-    # 3. 从命令行中结构化解析参数 
+    parser.add_argument('--label_to_extract', type=str, default="formation_energy")
+
+    # 3. 从命令行中结构化解析参数
     args = parser.parse_args()
     print(args)
     # epochs = args.epochs
@@ -95,5 +97,4 @@ if __name__ == '__main__':
     # output_path = args.output_path
     torch.multiprocessing.set_start_method('spawn')
     train(**vars(args))
-    
-    
+
