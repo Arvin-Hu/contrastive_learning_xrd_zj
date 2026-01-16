@@ -6,6 +6,7 @@ from torch.utils.data import Dataset, DataLoader
 import numpy as np
 from typing import Optional, Tuple, List
 from models.model import ContrastiveLoss
+from sklearn.metrics import r2_score
 from tqdm import tqdm
 import os
 
