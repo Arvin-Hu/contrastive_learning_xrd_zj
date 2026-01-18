@@ -68,17 +68,15 @@ class XRDDataset(Dataset):
 
         if label_to_extract == "formation_energy":
             pattern = r"[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?"
-            self.label_type = 0.0   # a float to record that we care the energy
         elif label_to_extract == "crystal_system":
             pattern = r"belongs to (\w+) system"
-            csdict = {"triclinic": 0.0,
-                      "monoclinic": 1.0,
-                      "orthorhombic": 2.0,
-                      "tetragonal": 3.0,
-                      "trigonal": 4.0,
-                      "hexagonal": 5.0,
-                      "cubic": 6.0}  # dictionary to map crystal string to float
-            self.label_type = 1.0   # a float to record that we care the crystal
+            csdict = {"triclinic": 0,
+                      "monoclinic": 1,
+                      "orthorhombic": 2,
+                      "tetragonal": 3,
+                      "trigonal": 4,
+                      "hexagonal": 5,
+                      "cubic": 6}  # dictionary to map crystal string to float
         else:
             raise ValueError("label_to_extract should be 'formation_energy' or 'crystal_system'!")
 
@@ -107,8 +105,12 @@ class XRDDataset(Dataset):
 
     def __getitem__(self, idx):
         xrd_emb, peaks_x, peaks_y, peaks_n = self.get_xrd_embeddings(self.xrd_files[idx])
-        label = torch.tensor(self.labels[idx], dtype=torch.float32)
-        return {'xrd_input': xrd_emb, 'xrd_file': self.xrd_files[idx], 'peaks_x': peaks_x, 'peaks_y': peaks_y, 'peaks_n': peaks_n, 'label': label}
+        label_idx = self.labels[idx]
+        if isinstance(label_idx, int):
+            label_idx = torch.tensor(label_idx, dtype=torch.int)
+        else:
+            label_idx = torch.tensor(label_idx, dtype=torch.float32)
+        return {'xrd_input': xrd_emb, 'xrd_file': self.xrd_files[idx], 'peaks_x': peaks_x, 'peaks_y': peaks_y, 'peaks_n': peaks_n, 'label': label_idx}
 
     def get_xrd_embeddings(self, xrd_path):
         with open(xrd_path, 'r') as f:
