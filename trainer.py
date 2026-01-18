@@ -100,7 +100,7 @@ class ContrastiveLearningTrainer:
             # 反向传播
             self.optimizer.zero_grad()
             loss.backward()
-            torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
+            nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
             self.optimizer.step()
             
             batch_count += 1
@@ -146,6 +146,9 @@ class ContrastiveLearningTrainer:
     def train(self, num_epochs: int, save_path: Optional[str] = None):
         """训练循环"""
         print("开始训练...")
+        if save_path:
+            print(f"模型数据存储文件夹: {save_path}")
+            os.makedirs(save_path, exist_ok=True)
         
         for epoch in range(self.start_epoch, num_epochs):
             train_loss = self.train_epoch(epoch)
@@ -167,8 +170,6 @@ class ContrastiveLearningTrainer:
             
             # 保存模型
             if save_path:
-                if not os.path.exists(save_path):
-                    os.makedirs(save_path)
                 self.save_model(os.path.join(save_path, f"epoch_{epoch+1}.pth"), epoch)
         
         if save_path:
@@ -217,13 +218,13 @@ class RegressionTrainer(ContrastiveLearningTrainer):
             logits = self.model(peaks_x, peaks_y, peaks_mask)
             
             # 计算loss
-            loss_fn = torch.nn.MSELoss()
+            loss_fn = nn.MSELoss()
             loss = loss_fn(logits.squeeze(1), labels)
             
             # 反向传播
             self.optimizer.zero_grad()
             loss.backward()
-            torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
+            nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
             self.optimizer.step()
             
             batch_count += 1
@@ -257,7 +258,7 @@ class RegressionTrainer(ContrastiveLearningTrainer):
             logits = self.model(peaks_x, peaks_y, peaks_mask)
             
             # 计算loss
-            loss_fn = torch.nn.MSELoss()
+            loss_fn = nn.MSELoss()
             loss = loss_fn(logits.squeeze(1), labels)
             
             total_loss += loss.item()

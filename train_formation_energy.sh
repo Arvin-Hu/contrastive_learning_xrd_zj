@@ -4,7 +4,7 @@
 MASTER_ADDR=${MASTER_ADDR:-"127.0.0.1"}
 MASTER_PORT=${MASTER_PORT:-$(shuf -i 20001-29999 -n 1)}
 NNODES=${WORLD_SIZE:-1}
-export CUDA_VISIBLE_DEVICES=2
+export CUDA_VISIBLE_DEVICES=0
 
 NPROC_PER_NODE=1
 
@@ -22,13 +22,12 @@ torchrun --nproc_per_node=${NPROC_PER_NODE} \
          train_reg.py \
          --learning_rate 1e-4 \
          --epochs 30 \
-         --batch_size 32 \
+         --batch_size 128 \
          --embedding_dim 256 \
          --output_path /mnt/minio/battery/xrd/train_outputs/xrd/formation_energy \
          --train_path /mnt/minio/battery/xrd/datasets/MP_formationenergy-QA-train.jsonl  \
          --eval_path /mnt/minio/battery/xrd/datasets/MP_formationenergy-QA-test.jsonl
- 
-         
-        
-         
-         
+
+
+
+
