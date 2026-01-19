@@ -84,14 +84,19 @@ class XRDDataset(Dataset):
             for line in f:
                 try:
                     data = json.loads(line)
-                    filename = data['xrd']
-                    xrd_files.append(os.path.join(xrd_path, filename))
                     match = re.findall(pattern, data["conversations"][1]["value"])
                     if label_to_extract == "formation_energy":
                         labels.append(float(match[0]))  # energy -> float
                     elif label_to_extract == "crystal_system":
-                        assert match[0] in csdict, f"{match[0]} is not a legal crystal system!"  # check indeed crystal
-                        labels.append(csdict(match[0])) # crystal string -> float
+                        if not match:
+                            print(f"未匹配到晶系: {data["conversations"][1]["value"]}")
+                            continue
+                        elif match[0] not in csdict:
+                            print(f"{match[0]} 不属于七种晶系: {data["conversations"][1]["value"]}")
+                            continue
+                        labels.append(csdict[match[0]]) # crystal string -> int
+                    filename = data['xrd']
+                    xrd_files.append(os.path.join(xrd_path, filename))
                 except:
                     print('Error skip line')
                     continue
