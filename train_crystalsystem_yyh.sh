@@ -21,13 +21,14 @@ torchrun --nproc_per_node=${NPROC_PER_NODE} \
          --rdzv_conf timeout=6000 \
          train_crystalsystem.py \
          --learning_rate 1e-4 \
-         --epochs 60 \
+         --epochs 90 \
          --batch_size 512 \
          --embedding_dim 256 \
-         --output_path /home/perm/workspace/data/mnt/minio/battery/xrd/train_outputs/xrd/crystal_system/v1 \
+         --log_dir runs/crystal_system_logs \
+         --output_path /home/perm/workspace/data/mnt/minio/battery/xrd/train_outputs/xrd/crystal_system \
          --train_path /mnt/minio/battery/xrd/datasets/MP_crystalsystem_QA_train.jsonl  \
          --eval_path /mnt/minio/battery/xrd/datasets/MP_crystalsystem_QA_test.jsonl \
-         --model_path /home/perm/workspace/data/mnt/minio/battery/xrd/train_outputs/xrd/crystal_system/v1/epoch_1.pth
+         --model_path /home/perm/workspace/data/mnt/minio/battery/xrd/train_outputs/xrd/crystal_system/epoch_77.pth
 
 
 # --model_path /home/perm/workspace/data/mnt/minio/battery/xrd/train_outputs/xrd/crystal_system/epoch_1.pth

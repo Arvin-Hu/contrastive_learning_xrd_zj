@@ -16,7 +16,8 @@ def train(
     num_layers=6,
     model_path=None,
     train_path=None,
-    eval_path=None
+    eval_path=None,
+    log_dir="logs"
 ):
     
     # 3. 创建数据集和数据加载器
@@ -52,6 +53,7 @@ def train(
         val_loader=eval_loader,
         learning_rate=learning_rate,
         weight_decay=weight_decay,
+        log_dir=log_dir,
     )
     if model_path:
         trainer.load_model(model_path)
@@ -82,6 +84,7 @@ if __name__ == '__main__':
     parser.add_argument('--model_path', type=str, default=None)
     parser.add_argument('--train_path', type=str, default=None)
     parser.add_argument('--eval_path', type=str, default=None)
+    parser.add_argument('--log_dir', type=str, default=None)
     
     # 3. 从命令行中结构化解析参数 
     args = parser.parse_args()

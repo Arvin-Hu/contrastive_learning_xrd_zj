@@ -8,6 +8,8 @@ from typing import Optional, Tuple, List
 from models.model import ContrastiveLoss
 from tqdm import tqdm
 import os
+from torch.utils.tensorboard import SummaryWriter
+import datetime
 
 import gc
 from sklearn.metrics import r2_score
@@ -43,7 +45,8 @@ class ContrastiveLearningTrainer:
                  learning_rate: float = 1e-4,
                  weight_decay: float = 1e-4,
                  temperature: float = 0.1,
-                 device: str = 'cuda' if torch.cuda.is_available() else 'cpu'):
+                 device: str = 'cuda' if torch.cuda.is_available() else 'cpu',
+                 log_dir=None):
         
         self.model = model.to(device)
         self.train_loader = train_loader
@@ -53,6 +56,10 @@ class ContrastiveLearningTrainer:
         self.temperature = temperature
         self.dtype=next(self.model.parameters()).dtype
         self.start_epoch = 0
+        
+        # tensorboard日志记录器。记录到模型同级的logs文件夹中
+        self.log_dir = log_dir  # 先保存，不初始化writer
+        self.writer = None
         
         # 优化器
         self.optimizer = optim.AdamW(
@@ -113,7 +120,7 @@ class ContrastiveLearningTrainer:
         return avg_loss
     
     @torch.no_grad()
-    def validate(self) -> Optional[float]:
+    def validate(self, epoch) -> Optional[float]:
         """验证"""
         if self.val_loader is None:
             return None
@@ -146,10 +153,17 @@ class ContrastiveLearningTrainer:
     def train(self, num_epochs: int, save_path: Optional[str] = None):
         """训练循环"""
         print("开始训练...")
+                
+        # 根据 save_path 设置 tensorboard 日志目录
+        if save_path:
+            log_dir = os.path.join(save_path, self.log_dir, datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
+        else:
+            log_dir = self.log_dir or "logs"
+        self.writer = SummaryWriter(log_dir=log_dir)                
         
         for epoch in range(self.start_epoch, num_epochs):
             train_loss = self.train_epoch(epoch)
-            val_loss = self.validate()
+            val_loss = self.validate(epoch)
             
             # 更新学习率
             self.scheduler.step()
@@ -165,6 +179,14 @@ class ContrastiveLearningTrainer:
                       f"Train Loss: {train_loss:.4f} | "
                       f"LR: {self.optimizer.param_groups[0]['lr']:.6f}")
             
+            # 记录到 tensorboard
+            self.writer.add_scalar('Loss/train', train_loss, epoch)
+            if val_loss is not None:
+                self.writer.add_scalar('Loss/val', val_loss, epoch)
+            self.writer.add_scalar('LearningRate', self.optimizer.param_groups[0]['lr'], epoch)
+            
+            self.writer.flush()
+            
             # 保存模型
             if save_path:
                 if not os.path.exists(save_path):
@@ -173,7 +195,9 @@ class ContrastiveLearningTrainer:
         
         if save_path:
             self.save_model(os.path.join(save_path, f"final.pth"), epoch)
-        
+
+        self.writer.close() # 关闭tensorboard writer
+
         print("训练完成！")
     
     def save_model(self, path: str, epoch: int=0):
@@ -291,7 +315,7 @@ class CrystalSystemClassificationTrainer(ContrastiveLearningTrainer):
         total = 0
 
         progress_bar = tqdm(self.train_loader, desc=f'Epoch {epoch+1}')
-        for batch in progress_bar:
+        for batch_idx, batch in enumerate(progress_bar):
             peaks_x, peaks_y, peaks_mask = batch['peaks_x'], batch['peaks_y'], batch['peaks_mask']
             labels = batch['labels'].to(self.device, dtype=torch.long)  # 分类任务用long
             peaks_x = peaks_x.to(self.device, dtype=self.dtype)
@@ -302,11 +326,11 @@ class CrystalSystemClassificationTrainer(ContrastiveLearningTrainer):
             logits = self.model(peaks_x, peaks_y, peaks_mask)  # [batch, 7]
             
             # 添加softmax层
-            probs = F.softmax(logits, dim=1)  # [batch, 7]
+            logits = F.softmax(logits, dim=1)  # [batch, 7]
 
             # 计算loss
             loss_fn = torch.nn.CrossEntropyLoss()
-            loss = loss_fn(probs, labels)
+            loss = loss_fn(logits, labels)
 
             # 反向传播
             self.optimizer.zero_grad()
@@ -314,8 +338,12 @@ class CrystalSystemClassificationTrainer(ContrastiveLearningTrainer):
             torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
             self.optimizer.step()
 
+            # 记录每个batch的loss到tensorboard
+            if self.writer is not None:
+                self.writer.add_scalar('Loss/batch', loss.item(), epoch * len(self.train_loader) + batch_idx)
+
             batch_count += 1
-            total_loss += loss.item()
+            total_loss += loss.item() # 累计损失。语法：loss.item()代表获取loss的数值，为什么是累加？因为要计算平均损失
 
             # 统计准确率
             preds = logits.argmax(dim=1)
@@ -330,7 +358,7 @@ class CrystalSystemClassificationTrainer(ContrastiveLearningTrainer):
         return avg_loss
 
     @torch.no_grad()
-    def validate(self) -> Optional[float]:
+    def validate(self, epoch) -> Optional[float]:
         """验证"""
         if self.val_loader is None:
             return None
@@ -363,4 +391,9 @@ class CrystalSystemClassificationTrainer(ContrastiveLearningTrainer):
         acc = correct / total if total > 0 else 0
         self.history['val_loss'].append(avg_loss)
         print(f"Val Accuracy: {acc:.4f}")
+        
+        # 记录到tensorboard
+        if self.writer is not None:
+            self.writer.add_scalar('Accuracy/val', acc, epoch)
+        
         return avg_loss

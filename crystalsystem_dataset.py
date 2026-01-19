@@ -8,6 +8,7 @@ import json
 import torch.nn.functional as F
 from scipy.signal import find_peaks
 import re
+import traceback
 
 
 
@@ -84,11 +85,11 @@ class XRDDataset(Dataset):
             for line in f:
                 try:
                     data = json.loads(line)
-                    filename = data['xrd']
-                    xrd_files.append(os.path.join(xrd_path, filename))
                     match = re.findall(pattern, data["conversations"][1]["value"])
                     if label_to_extract == "formation_energy":
                         labels.append(float(match[0]))  # energy -> float
+                        filename = data['xrd']
+                        xrd_files.append(os.path.join(xrd_path, filename))
                     elif label_to_extract == "crystal_system":
                         if not match:
                             print(f"未匹配到crystal_system: {data['conversations'][1]['value']}")
@@ -99,10 +100,12 @@ class XRDDataset(Dataset):
                             # 处理非法晶体系统，报错终止
                             raise ValueError(f"{match[0]} is not a legal crystal system!")
                         labels.append(csdict[match[0]]) # crystal string -> int
-                except:
-                    print('Error skip line')
-                    # 处理解析错误，报错终止
-                    raise ValueError("Error parsing line")
+                        filename = data['xrd']
+                        xrd_files.append(os.path.join(xrd_path, filename))
+                except Exception as e:
+                    print(f'Error skip line: {e}')
+                    # 处理解析错误，报错终止                    
+                    traceback.print_exc()
 
         self.xrd_files = np.array(xrd_files)    # list of strings -> np array of strings
         self.labels = np.array(labels)          # list of floats -> np array of floats
