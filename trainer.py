@@ -159,11 +159,13 @@ class ContrastiveLearningTrainer:
                 for old_epoch in range(self.start_epoch):
                     writer.add_scalar("train_loss", self.history['train_loss'][old_epoch], old_epoch)
                     writer.add_scalar("val_loss", self.history['val_loss'][old_epoch], old_epoch)
+                    writer.flush()
             for epoch in range(self.start_epoch, num_epochs):
                 train_loss = self.train_epoch(epoch)
                 writer.add_scalar("train_loss", train_loss, epoch)
                 val_loss = self.validate()
                 writer.add_scalar("val_loss", val_loss, epoch)
+                writer.flush()
 
                 # 更新学习率
                 self.scheduler.step()
@@ -182,7 +184,7 @@ class ContrastiveLearningTrainer:
                 # 保存模型
                 if save_path:
                     self.save_model(os.path.join(save_path, f"epoch_{epoch+1}.pth"), epoch)
-            writer.flush()
+            
         
         if save_path:
             self.save_model(os.path.join(save_path, f"final.pth"), epoch)
