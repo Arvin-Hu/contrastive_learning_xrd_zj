@@ -80,7 +80,6 @@ if __name__ == '__main__':
     parser.add_argument('--model_path', type=str, default=None)
     parser.add_argument('--train_path', type=str, default=None)
     parser.add_argument('--eval_path', type=str, default=None)
-    parser.add_argument('--label_to_extract', type=str, default="formation_energy")
 
     # 3. 从命令行中结构化解析参数
     args = parser.parse_args()

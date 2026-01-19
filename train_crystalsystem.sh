@@ -19,7 +19,7 @@ torchrun --nproc_per_node=${NPROC_PER_NODE} \
          --master_addr=${MASTER_ADDR} \
          --master_port=${MASTER_PORT} \
          --rdzv_conf timeout=6000 \
-         train_crystalsystem.py \
+         train_crystal.py \
          --learning_rate 1e-4 \
          --epochs 60 \
          --batch_size 512 \
