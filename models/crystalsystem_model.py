@@ -10,9 +10,11 @@ from models.qformer import QFormer
 from models.model import PeakTokenizer
 
 
-class XRDRegressionModel(nn.Module):
+
+
+class XRDClassificationModel(nn.Module):
     """
-    XRD回归模型，预测属性
+    XRD分类模型，预测晶体系统
     """
     def __init__(self,                 
                  embedding_dim: int = 256,
@@ -40,7 +42,7 @@ class XRDRegressionModel(nn.Module):
             nn.Linear(64, 32),
             nn.BatchNorm1d(32),
             nn.ReLU(),
-            nn.Linear(32, 1)
+            nn.Linear(32, 7)  # 这里改为7
         )
         
         
