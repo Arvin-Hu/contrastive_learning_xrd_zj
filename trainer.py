@@ -10,6 +10,7 @@ from tqdm import tqdm
 import os
 
 import gc
+from sklearn.metrics import r2_score
 
 def debug_memory():
     print("="*50)
