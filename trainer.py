@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
+from torch.utils.tensorboard import SummaryWriter
 import numpy as np
 from typing import Optional, Tuple, List
 from models.model import ContrastiveLoss
@@ -150,27 +151,38 @@ class ContrastiveLearningTrainer:
             print(f"模型数据存储文件夹: {save_path}")
             os.makedirs(save_path, exist_ok=True)
         
-        for epoch in range(self.start_epoch, num_epochs):
-            train_loss = self.train_epoch(epoch)
-            val_loss = self.validate()
-            
-            # 更新学习率
-            self.scheduler.step()
-            
-            # 打印进度
-            if val_loss is not None:
-                print(f"Epoch {epoch+1}/{num_epochs} | "
-                      f"Train Loss: {train_loss:.4f} | "
-                      f"Val Loss: {val_loss:.4f} | "
-                      f"LR: {self.optimizer.param_groups[0]['lr']:.6f}")
-            else:
-                print(f"Epoch {epoch+1}/{num_epochs} | "
-                      f"Train Loss: {train_loss:.4f} | "
-                      f"LR: {self.optimizer.param_groups[0]['lr']:.6f}")
-            
-            # 保存模型
-            if save_path:
-                self.save_model(os.path.join(save_path, f"epoch_{epoch+1}.pth"), epoch)
+        with SummaryWriter() as writer:
+            current_abs = os.path.abspath(os.getcwd())
+            folder1_path = os.path.join(current_abs, "run")
+            print(f"TensorBoard SummaryWriter 存储文件夹: {folder1_path}")
+            if self.start_epoch > 0: # some epochs has been trained before, write to TensorBoard
+                for old_epoch in range(self.start_epoch):
+                    writer.add_scalar("train_loss", self.history['train_loss'][old_epoch], old_epoch)
+                    writer.add_scalar("val_loss", self.history['val_loss'][old_epoch], old_epoch)
+            for epoch in range(self.start_epoch, num_epochs):
+                train_loss = self.train_epoch(epoch)
+                writer.add_scalar("train_loss", train_loss, epoch)
+                val_loss = self.validate()
+                writer.add_scalar("val_loss", val_loss, epoch)
+
+                # 更新学习率
+                self.scheduler.step()
+                
+                # 打印进度
+                if val_loss is not None:
+                    print(f"Epoch {epoch+1}/{num_epochs} | "
+                        f"Train Loss: {train_loss:.4f} | "
+                        f"Val Loss: {val_loss:.4f} | "
+                        f"LR: {self.optimizer.param_groups[0]['lr']:.6f}")
+                else:
+                    print(f"Epoch {epoch+1}/{num_epochs} | "
+                        f"Train Loss: {train_loss:.4f} | "
+                        f"LR: {self.optimizer.param_groups[0]['lr']:.6f}")
+                
+                # 保存模型
+                if save_path:
+                    self.save_model(os.path.join(save_path, f"epoch_{epoch+1}.pth"), epoch)
+            writer.flush()
         
         if save_path:
             self.save_model(os.path.join(save_path, f"final.pth"), epoch)

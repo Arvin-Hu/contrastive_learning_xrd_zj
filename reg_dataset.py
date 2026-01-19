@@ -102,7 +102,7 @@ class XRDDataset(Dataset):
                     continue
 
         self.xrd_files = np.array(xrd_files)    # list of strings -> np array of strings
-        self.labels = np.array(labels)          # list of floats -> np array of floats
+        self.labels = np.array(labels)          # list of float or int -> np array of float or int
         print(f'finish init dataset, dataset size: {len(self.xrd_files)}')
 
     def __len__(self):
