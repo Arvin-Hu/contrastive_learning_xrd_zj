@@ -85,7 +85,6 @@ class XRDClassificationModel(nn.Module):
     XRD分类模型，预测晶系
     """
     def __init__(self,
-                 out_features=7, # seven crystal systems
                  embedding_dim: int = 256,
                  num_heads: int = 8,
                  num_layers: int = 6,

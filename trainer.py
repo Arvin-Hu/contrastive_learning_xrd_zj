@@ -291,3 +291,84 @@ class RegressionTrainer(ContrastiveLearningTrainer):
         self.history['val_loss'].append(avg_loss)
         
         return avg_loss
+    
+class CrystalSystemClassificationTrainer(ContrastiveLearningTrainer):
+    def train_epoch(self, epoch) -> float:
+        """训练一个epoch"""
+        self.model.train()
+        total_loss = 0
+        batch_count = 0
+        correct = 0
+        total = 0
+
+        progress_bar = tqdm(self.train_loader, desc=f'Epoch {epoch+1}')
+        for batch in progress_bar:
+            peaks_x, peaks_y, peaks_mask = batch['peaks_x'], batch['peaks_y'], batch['peaks_mask']
+            labels = batch['labels'].to(self.device, dtype=torch.long)  # 分类任务用long
+            peaks_x = peaks_x.to(self.device, dtype=self.dtype)
+            peaks_y = peaks_y.to(self.device, dtype=self.dtype)
+            peaks_mask = peaks_mask.to(self.device)
+
+            # 前向传播
+            logits = self.model(peaks_x, peaks_y, peaks_mask)  # [batch, 7]
+
+            # 计算loss
+            loss_fn = nn.CrossEntropyLoss()
+            loss = loss_fn(logits, labels)
+
+            # 反向传播
+            self.optimizer.zero_grad()
+            loss.backward()
+            nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
+            self.optimizer.step()
+
+            batch_count += 1
+            total_loss += loss.item()
+
+            # 统计准确率
+            preds = logits.argmax(dim=1)
+            correct += (preds == labels).sum().item()
+            total += labels.size(0)
+
+        avg_loss = total_loss / batch_count
+        acc = correct / total if total > 0 else 0
+        self.history['train_loss'].append(avg_loss)
+        self.history['learning_rate'].append(self.optimizer.param_groups[0]['lr'])
+        print(f"Train Accuracy: {acc:.4f}")
+        return avg_loss
+
+    @torch.no_grad()
+    def validate(self) -> Optional[float]:
+        """验证"""
+        if self.val_loader is None:
+            return None
+
+        self.model.eval()
+        total_loss = 0
+        batch_count = 0
+        correct = 0
+        total = 0
+
+        for batch in self.val_loader:
+            peaks_x, peaks_y, peaks_mask = batch['peaks_x'], batch['peaks_y'], batch['peaks_mask']
+            labels = batch['labels'].to(self.device, dtype=torch.long)
+            peaks_x = peaks_x.to(self.device, dtype=self.dtype)
+            peaks_y = peaks_y.to(self.device, dtype=self.dtype)
+            peaks_mask = peaks_mask.to(self.device)
+
+            logits = self.model(peaks_x, peaks_y, peaks_mask)
+            loss_fn = nn.CrossEntropyLoss()
+            loss = loss_fn(logits, labels)
+
+            total_loss += loss.item()
+            batch_count += 1
+
+            preds = logits.argmax(dim=1)
+            correct += (preds == labels).sum().item()
+            total += labels.size(0)
+
+        avg_loss = total_loss / batch_count
+        acc = correct / total if total > 0 else 0
+        self.history['val_loss'].append(avg_loss)
+        print(f"Val Accuracy: {acc:.4f}")
+        return avg_loss

@@ -1,6 +1,6 @@
 import numpy as np
-from models.reg_model import XRDRegressionModel
-from trainer import RegressionTrainer
+from models.reg_model import XRDClassificationModel
+from trainer import CrystalSystemClassificationTrainer
 from reg_dataset import XRDDataset, collate_fn
 import torch
 from torch.utils.data import DataLoader
@@ -22,17 +22,17 @@ def train(
     # 3. 创建数据集和数据加载器
     train_dataset = XRDDataset(
         xrd_path='/mnt/minio/battery/xrd/datasets/raw_data/mp_xrd',
-        json_path=train_path, label_to_extract="formation_energy"
+        json_path=train_path, label_to_extract="crystal_system"
     )
     eval_dataset = XRDDataset(
         xrd_path='/mnt/minio/battery/xrd/datasets/raw_data/mp_xrd',
-        json_path=eval_path, label_to_extract="formation_energy"
+        json_path=eval_path, label_to_extract="crystal_system"
     )
     train_loader = DataLoader(train_dataset, batch_size=batch_size, num_workers=8, pin_memory=True, shuffle=True, collate_fn=collate_fn)
     eval_loader = DataLoader(eval_dataset, batch_size=batch_size, shuffle=True, pin_memory=True, collate_fn=collate_fn)
 
     # 4. 初始化模型
-    model = XRDRegressionModel(
+    model = XRDClassificationModel(
         embedding_dim=embedding_dim,
     )
     model = model.to(dtype=torch.float32)
@@ -44,7 +44,7 @@ def train(
 
 
     # 5. 创建训练器并训练
-    trainer = RegressionTrainer(
+    trainer = CrystalSystemClassificationTrainer(
         model=model,
         train_loader=train_loader,
         val_loader=eval_loader,

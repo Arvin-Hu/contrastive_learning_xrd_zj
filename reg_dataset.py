@@ -8,6 +8,7 @@ import json
 import torch.nn.functional as F
 from scipy.signal import find_peaks
 import re
+import traceback
 
 
 
@@ -97,8 +98,10 @@ class XRDDataset(Dataset):
                         labels.append(csdict[match[0]]) # crystal string -> int
                     filename = data['xrd']
                     xrd_files.append(os.path.join(xrd_path, filename))
-                except:
-                    print('Error skip line')
+                except Exception as e:
+                    print(f'Error: {e}, skip line')
+                    print("Traceback (most recent call last):")
+                    print(traceback.format_exc())
                     continue
 
         self.xrd_files = np.array(xrd_files)    # list of strings -> np array of strings
