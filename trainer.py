@@ -153,7 +153,7 @@ class ContrastiveLearningTrainer:
         
         with SummaryWriter() as writer:
             current_abs = os.path.abspath(os.getcwd())
-            folder1_path = os.path.join(current_abs, "run")
+            folder1_path = os.path.join(current_abs, "runs")
             print(f"TensorBoard SummaryWriter 存储文件夹: {folder1_path}")
             if self.start_epoch > 0: # some epochs has been trained before, write to TensorBoard
                 for old_epoch in range(self.start_epoch):

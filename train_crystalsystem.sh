@@ -26,10 +26,8 @@ torchrun --nproc_per_node=${NPROC_PER_NODE} \
          --embedding_dim 256 \
          --output_path /mnt/minio/battery/xrd/train_outputs/xrd/crystal_system/v1 \
          --train_path /mnt/minio/battery/xrd/datasets/MP_crystalsystem_QA_train.jsonl  \
-         --eval_path /mnt/minio/battery/xrd/datasets/MP_crystalsystem_QA_test.jsonl
-
-
-# --model_path /home/perm/workspace/data/mnt/minio/battery/xrd/train_outputs/xrd/crystal_system/epoch_1.pth
+         --eval_path /mnt/minio/battery/xrd/datasets/MP_crystalsystem_QA_test.jsonl \
+         # --model_path /mnt/minio/battery/xrd/train_outputs/xrd/crystal_system/v1/epoch_13.pth
 
 # /mnt/minio/battery/xrd/train_outputs/xrd/formation_energy/yyh
 
