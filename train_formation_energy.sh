@@ -14,13 +14,10 @@ NODE_RANK=0
 # 总进程数（可选，通常是 NNODES * NPROC_PER_NODE）
 WORLD_SIZE=$((NNODES * NPROC_PER_NODE))
 
-<<<<<<< HEAD
-=======
 
 #TODO early stop; 保存best ckpt; 训练数据异常点；加入化学式；数据增强策略
 
 
->>>>>>> c531f2bd892465a0ba7331eaf339efcdb218a320
 # Launch training
 torchrun --nproc_per_node=${NPROC_PER_NODE} \
          --master_addr=${MASTER_ADDR} \
