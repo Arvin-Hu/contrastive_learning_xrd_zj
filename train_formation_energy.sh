@@ -28,14 +28,10 @@ torchrun --nproc_per_node=${NPROC_PER_NODE} \
          --epochs 100 \
          --batch_size 32 \
          --embedding_dim 256 \
-         --model_path /mnt/minio/battery/xrd/train_outputs/xrd/formation_energy_formula/epoch_45.pth \
-         --output_path /mnt/minio/battery/xrd/train_outputs/xrd/formation_energy_formula \
-         --train_path /mnt/minio/battery/xrd/datasets/MP_xrd-train.jsonl  \
-         --eval_path /mnt/minio/battery/xrd/datasets/MP_xrd-test.jsonl \
-         --trainer_class FormationEnergyTrainer \
-         --model_class XRDFormulaModel
-         
->>>>>>> c531f2bd892465a0ba7331eaf339efcdb218a320
+         --output_path /mnt/minio/battery/xrd/train_outputs/xrd/formation_energy \
+         --train_path /mnt/minio/battery/xrd/datasets/MP_formationenergy-QA-train.jsonl  \
+         --eval_path /mnt/minio/battery/xrd/datasets/MP_formationenergy-QA-test.jsonl
+ 
          
         
          
