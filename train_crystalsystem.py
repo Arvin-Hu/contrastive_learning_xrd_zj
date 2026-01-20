@@ -6,8 +6,8 @@ from trainer import (
     RegressionTrainer,
     CrystalSystemClassificationTrainer
 )
-# from crystalsystem_dataset import XRDDataset, collate_fn
-from crystalsystem_dataset import XRDFullDataset, xrd_collate_fn
+
+from dataset.crystalsystem_dataset import XRDFullDataset, xrd_collate_fn
 import torch
 from torch.utils.data import DataLoader
 
@@ -135,9 +135,7 @@ if __name__ == '__main__':
     # 3. 从命令行中结构化解析参数 
     args = parser.parse_args()
     print(args)
-    
-    print("args.output_path:", args.output_path)
-    # assert output_path is not None, "output_path 不能为空！"
+
     
     # epochs = args.epochs
     # batch_size = args.batch_size

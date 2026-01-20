@@ -471,7 +471,7 @@ class CrystalSystemClassificationTrainer(ContrastiveLearningTrainer):
         correct = 0
         total = 0
 
-        for batch in self.val_loader:
+        for batch_idx, batch in enumerate(self.val_loader):
             # peaks_x, peaks_y, peaks_mask = batch['peaks_x'], batch['peaks_y'], batch['peaks_mask']
             # labels = batch['labels'].to(self.device, dtype=torch.long)
             # peaks_x = peaks_x.to(self.device, dtype=self.dtype)
@@ -495,6 +495,10 @@ class CrystalSystemClassificationTrainer(ContrastiveLearningTrainer):
             
             loss_fn = torch.nn.CrossEntropyLoss()
             loss = loss_fn(logits, labels)
+            
+            # 记录每个batch的loss到tensorboard
+            if self.writer is not None:
+                self.writer.add_scalar('Loss/batch_val', loss.item(), epoch * len(self.val_loader) + batch_idx)
 
             total_loss += loss.item()
             batch_count += 1

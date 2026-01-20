@@ -30,7 +30,7 @@ torchrun --nproc_per_node=${NPROC_PER_NODE} \
          --eval_path /mnt/minio/battery/xrd/datasets/MP_xrd-test.jsonl \
          --trainer_class CrystalSystemClassificationTrainer \
          --model_class XRDFormulaClassificationModel \
-         --model_path /home/perm/workspace/data/mnt/minio/battery/xrd/train_outputs/xrd/crystal_system/v2_full/epoch_5.pth
+         --model_path /home/perm/workspace/data/mnt/minio/battery/xrd/train_outputs/xrd/crystal_system/v2_full/epoch_44.pth
 
 
 # --model_path /home/perm/workspace/data/mnt/minio/battery/xrd/train_outputs/xrd/crystal_system/epoch_1.pth

@@ -118,7 +118,7 @@ class XRDFullDataset(Dataset):
             "tetragonal": 3,
             "trigonal": 4,
             "hexagonal": 5,
-            "cubic": 6}  # dictionary to map crystal string to float
+            "cubic": 6}  # dictionary to map crystal string to int
         
         with open(json_path, 'r') as f:
             for line in f:
@@ -127,7 +127,7 @@ class XRDFullDataset(Dataset):
                 filename = data['xrd']
                 xrd_files.append(os.path.join(xrd_path, filename))
                 # crystal_systems.append(data['crystal_system'])
-                crystal_systems.append(csdict[data['crystal_system']])
+                crystal_systems.append(csdict[data['crystal_system']]) # 
                 bandgaps.append(data['bandgap'])
                 formulas.append(data['formula'])
                 lattice_parameters.append(data['lattice_parameters'])
