@@ -14,13 +14,10 @@ NODE_RANK=0
 # 总进程数（可选，通常是 NNODES * NPROC_PER_NODE）
 WORLD_SIZE=$((NNODES * NPROC_PER_NODE))
 
-<<<<<<< HEAD
-=======
 
 #TODO early stop; 保存best ckpt; 训练数据异常点；加入化学式；数据增强策略
 
 
->>>>>>> c531f2bd892465a0ba7331eaf339efcdb218a320
 # Launch training
 torchrun --nproc_per_node=${NPROC_PER_NODE} \
          --master_addr=${MASTER_ADDR} \
@@ -31,14 +28,12 @@ torchrun --nproc_per_node=${NPROC_PER_NODE} \
          --epochs 100 \
          --batch_size 32 \
          --embedding_dim 256 \
-         --model_path /mnt/minio/battery/xrd/train_outputs/xrd/formation_energy_formula/epoch_45.pth \
          --output_path /mnt/minio/battery/xrd/train_outputs/xrd/formation_energy_formula \
          --train_path /mnt/minio/battery/xrd/datasets/MP_xrd-train.jsonl  \
          --eval_path /mnt/minio/battery/xrd/datasets/MP_xrd-test.jsonl \
          --trainer_class FormationEnergyTrainer \
          --model_class XRDFormulaModel
          
->>>>>>> c531f2bd892465a0ba7331eaf339efcdb218a320
          
         
          
