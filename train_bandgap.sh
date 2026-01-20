@@ -28,7 +28,6 @@ torchrun --nproc_per_node=${NPROC_PER_NODE} \
          --epochs 100 \
          --batch_size 32 \
          --embedding_dim 256 \
-         --model_path /mnt/minio/battery/xrd/train_outputs/xrd/formation_energy_formula/epoch_45.pth \
          --output_path /mnt/minio/battery/xrd/train_outputs/xrd/formation_energy_formula \
          --train_path /mnt/minio/battery/xrd/datasets/MP_xrd-train.jsonl  \
          --eval_path /mnt/minio/battery/xrd/datasets/MP_xrd-test.jsonl \

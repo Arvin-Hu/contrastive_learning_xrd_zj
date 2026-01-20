@@ -8,7 +8,7 @@ from typing import Optional, Tuple, List
 from models.model import ContrastiveLoss
 from tqdm import tqdm
 import os
-
+from sklearn.metrics import r2_score
 import gc
 
 def debug_memory():
@@ -216,7 +216,7 @@ class RegressionTrainer(ContrastiveLearningTrainer):
             logits = self.model(peaks_x, peaks_y, peaks_mask)
             
             # 计算loss
-            loss_fn = torch.nn.MSELoss()
+            loss_fn = torch.nn.L1Loss()
             loss = loss_fn(logits.squeeze(1), labels)
             
             # 反向传播
@@ -254,6 +254,93 @@ class RegressionTrainer(ContrastiveLearningTrainer):
             
             # 前向传播
             logits = self.model(peaks_x, peaks_y, peaks_mask)
+            
+            # 计算loss
+            loss_fn = torch.nn.MSELoss()
+            loss = loss_fn(logits.squeeze(1), labels)
+            
+            total_loss += loss.item()
+            batch_count += 1
+            
+            logits = logits.cpu().detach().numpy()
+            labels = labels.cpu().detach().numpy()
+            
+            label_list.extend(labels.reshape(-1).tolist())
+            pred_list.extend(logits.reshape(-1).tolist())
+            
+        
+        r2 = r2_score(np.array(label_list), np.array(pred_list))
+        mae = np.abs(np.array(label_list) - np.array(pred_list)).mean()
+        print('r2: {}, mae: {}'.format(r2, mae))
+        
+        avg_loss = total_loss / batch_count
+        self.history['val_loss'].append(avg_loss)
+        
+        return avg_loss
+    
+    
+class FormationEnergyTrainer(RegressionTrainer):
+    def train_epoch(self, epoch) -> float:
+        """训练一个epoch"""
+        self.model.train()
+        total_loss = 0
+        batch_count = 0
+        
+        progress_bar = tqdm(self.train_loader, desc=f'Epoch {epoch+1}')
+        for batch in progress_bar:
+            peaks_x, peaks_y, peaks_mask = batch['peaks_x'], batch['peaks_y'], batch['peaks_mask']
+            formula, formula_mask = batch['formula'], batch['formula_mask']
+            labels = batch['formation_energy']
+            peaks_x = peaks_x.to(self.device, dtype=self.dtype)
+            peaks_y = peaks_y.to(self.device, dtype=self.dtype)
+            peaks_mask = peaks_mask.to(self.device)
+            labels = labels.to(self.device, dtype=self.dtype)
+            formula, formula_mask = formula.to(self.device), formula_mask.to(self.device)
+            
+            # 前向传播
+            logits = self.model(peaks_x, peaks_y, peaks_mask, formula, formula_mask)
+            
+            # 计算loss
+            loss_fn = torch.nn.L1Loss()
+            loss = loss_fn(logits.squeeze(1), labels)
+            
+            # 反向传播
+            self.optimizer.zero_grad()
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
+            self.optimizer.step()
+            
+            batch_count += 1
+            total_loss += loss.item()
+                    
+        avg_loss = total_loss / batch_count
+        self.history['train_loss'].append(avg_loss)
+        self.history['learning_rate'].append(self.optimizer.param_groups[0]['lr'])
+        
+        return avg_loss
+    
+    @torch.no_grad()
+    def validate(self) -> Optional[float]:
+        """验证"""
+        if self.val_loader is None:
+            return None
+        
+        self.model.eval()
+        total_loss = 0
+        batch_count = 0
+        label_list, pred_list = [], []
+        for batch in self.val_loader:
+            peaks_x, peaks_y, peaks_mask = batch['peaks_x'], batch['peaks_y'], batch['peaks_mask']
+            formula, formula_mask = batch['formula'], batch['formula_mask']
+            labels = batch['formation_energy']
+            peaks_x = peaks_x.to(self.device, dtype=self.dtype)
+            peaks_y = peaks_y.to(self.device, dtype=self.dtype)
+            peaks_mask = peaks_mask.to(self.device)
+            labels = labels.to(self.device, dtype=self.dtype)
+            formula, formula_mask = formula.to(self.device), formula_mask.to(self.device)
+            
+            # 前向传播
+            logits = self.model(peaks_x, peaks_y, peaks_mask, formula, formula_mask)
             
             # 计算loss
             loss_fn = torch.nn.MSELoss()
