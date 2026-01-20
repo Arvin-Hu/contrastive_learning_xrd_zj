@@ -1,7 +1,13 @@
 import numpy as np
-from models.crystalsystem_model import XRDClassificationModel
-from trainer import CrystalSystemClassificationTrainer
-from crystalsystem_dataset import XRDDataset, collate_fn
+from models.crystalsystem_model import XRDClassificationModel,XRDFormulaClassificationModel
+from models.reg_model import XRDRegressionModel, XRDConvRegressionModel, XRDFormulaModel
+from trainer import (
+    FormationEnergyTrainer,
+    RegressionTrainer,
+    CrystalSystemClassificationTrainer
+)
+# from crystalsystem_dataset import XRDDataset, collate_fn
+from crystalsystem_dataset import XRDFullDataset, xrd_collate_fn
 import torch
 from torch.utils.data import DataLoader
 
@@ -17,27 +23,45 @@ def train(
     model_path=None,
     train_path=None,
     eval_path=None,
-    log_dir="logs"
+    log_dir="logs",
+    model_class='XRDFormulaModel',
+    trainer_class='RegressionTrainer'
 ):
     
     # 3. 创建数据集和数据加载器
-    train_dataset = XRDDataset(
+    train_dataset = XRDFullDataset(
         xrd_path='/mnt/minio/battery/xrd/datasets/raw_data/mp_xrd',
-        json_path=train_path,
-        label_to_extract="crystal_system"
+        json_path=train_path
     )
-    eval_dataset = XRDDataset(
+    eval_dataset = XRDFullDataset(
         xrd_path='/mnt/minio/battery/xrd/datasets/raw_data/mp_xrd',
-        json_path=eval_path,
-        label_to_extract="crystal_system"
+        json_path=eval_path
     )
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, num_workers=8, pin_memory=True, shuffle=True, collate_fn=collate_fn)
-    eval_loader = DataLoader(eval_dataset, batch_size=batch_size, shuffle=True, pin_memory=True, collate_fn=collate_fn)
-    
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, num_workers=8, pin_memory=True, shuffle=True, collate_fn=xrd_collate_fn)
+    eval_loader = DataLoader(eval_dataset, batch_size=batch_size, shuffle=True, pin_memory=True, collate_fn=xrd_collate_fn)
+
     # 4. 初始化模型
-    model = XRDClassificationModel(
+    if model_class == 'XRDConvRegressionModel':
+        model = XRDConvRegressionModel(
+            embedding_dim=embedding_dim,
+        )
+    elif model_class == 'XRDFormulaModel':
+        model = XRDFormulaModel(
+            embedding_dim=embedding_dim,
+        )
+    elif model_class == 'XRDRegressionModel':
+        model = XRDRegressionModel(
+            embedding_dim=embedding_dim,
+        )
+    elif model_class == 'XRDClassificationModel':
+        model = XRDClassificationModel(
         embedding_dim=embedding_dim,
     )
+    elif model_class == 'XRDFormulaClassificationModel':
+        model = XRDFormulaClassificationModel(
+            embedding_dim=embedding_dim,
+        )
+        
     model = model.to(dtype=torch.float32)
     
     print(f"可训练参数: {sum(p.numel() for p in model.parameters() if p.requires_grad)}")
@@ -47,14 +71,32 @@ def train(
 
     
     # 5. 创建训练器并训练
-    trainer = CrystalSystemClassificationTrainer(
-        model=model,
-        train_loader=train_loader,
-        val_loader=eval_loader,
-        learning_rate=learning_rate,
-        weight_decay=weight_decay,
-        log_dir=log_dir,
-    )
+    if trainer_class == 'FormationEnergyTrainer':
+        trainer = FormationEnergyTrainer(
+            model=model,
+            train_loader=train_loader,
+            val_loader=eval_loader,
+            learning_rate=learning_rate,
+            weight_decay=weight_decay,
+        )
+    elif trainer_class == 'RegressionTrainer':
+        trainer = RegressionTrainer(
+            model=model,
+            train_loader=train_loader,
+            val_loader=eval_loader,
+            learning_rate=learning_rate,
+            weight_decay=weight_decay,
+        )
+    elif trainer_class == 'CrystalSystemClassificationTrainer':
+        trainer = CrystalSystemClassificationTrainer(
+            model=model,
+            train_loader=train_loader,
+            val_loader=eval_loader,
+            learning_rate=learning_rate,
+            weight_decay=weight_decay,
+            log_dir=log_dir,
+        )
+        
     if model_path:
         trainer.load_model(model_path)
     
@@ -84,11 +126,19 @@ if __name__ == '__main__':
     parser.add_argument('--model_path', type=str, default=None)
     parser.add_argument('--train_path', type=str, default=None)
     parser.add_argument('--eval_path', type=str, default=None)
-    parser.add_argument('--log_dir', type=str, default=None)
+    parser.add_argument('--log_dir', type=str, default="logs")
+    parser.add_argument('--model_class', type=str, default='XRDFormulaModel')
+    parser.add_argument('--trainer_class', type=str, default='FormationEnergyTrainer')
+    
+
     
     # 3. 从命令行中结构化解析参数 
     args = parser.parse_args()
     print(args)
+    
+    print("args.output_path:", args.output_path)
+    # assert output_path is not None, "output_path 不能为空！"
+    
     # epochs = args.epochs
     # batch_size = args.batch_size
     # temperature = args.temperature

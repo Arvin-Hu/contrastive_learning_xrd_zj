@@ -4,7 +4,7 @@
 MASTER_ADDR=${MASTER_ADDR:-"127.0.0.1"}
 MASTER_PORT=${MASTER_PORT:-$(shuf -i 20001-29999 -n 1)}
 NNODES=${WORLD_SIZE:-1}
-export CUDA_VISIBLE_DEVICES=3
+export CUDA_VISIBLE_DEVICES=2
 
 NPROC_PER_NODE=1
 
@@ -22,13 +22,15 @@ torchrun --nproc_per_node=${NPROC_PER_NODE} \
          train_crystalsystem.py \
          --learning_rate 1e-4 \
          --epochs 90 \
-         --batch_size 512 \
+         --batch_size 1024 \
          --embedding_dim 256 \
          --log_dir runs/crystal_system_logs \
-         --output_path /home/perm/workspace/data/mnt/minio/battery/xrd/train_outputs/xrd/crystal_system \
-         --train_path /mnt/minio/battery/xrd/datasets/MP_crystalsystem_QA_train.jsonl  \
-         --eval_path /mnt/minio/battery/xrd/datasets/MP_crystalsystem_QA_test.jsonl \
-         --model_path /home/perm/workspace/data/mnt/minio/battery/xrd/train_outputs/xrd/crystal_system/epoch_77.pth
+         --output_path /home/perm/workspace/data/mnt/minio/battery/xrd/train_outputs/xrd/crystal_system/v2_full \
+         --train_path /mnt/minio/battery/xrd/datasets/MP_xrd-train.jsonl  \
+         --eval_path /mnt/minio/battery/xrd/datasets/MP_xrd-test.jsonl \
+         --trainer_class CrystalSystemClassificationTrainer \
+         --model_class XRDFormulaClassificationModel \
+         --model_path /home/perm/workspace/data/mnt/minio/battery/xrd/train_outputs/xrd/crystal_system/v2_full/epoch_5.pth
 
 
 # --model_path /home/perm/workspace/data/mnt/minio/battery/xrd/train_outputs/xrd/crystal_system/epoch_1.pth

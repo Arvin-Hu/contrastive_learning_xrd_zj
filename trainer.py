@@ -10,10 +10,8 @@ from tqdm import tqdm
 import os
 from torch.utils.tensorboard import SummaryWriter
 import datetime
-
 from sklearn.metrics import r2_score
 import gc
-from sklearn.metrics import r2_score
 
 def debug_memory():
     print("="*50)
@@ -154,7 +152,12 @@ class ContrastiveLearningTrainer:
     def train(self, num_epochs: int, save_path: Optional[str] = None):
         """训练循环"""
         print("开始训练...")
-                
+    
+        print("save_path:", save_path)
+        assert save_path is not None, "save_path 不能为空！"
+
+        print("self.log_dir:", self.log_dir)
+
         # 根据 save_path 设置 tensorboard 日志目录
         if save_path:
             log_dir = os.path.join(save_path, self.log_dir, datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
@@ -404,17 +407,28 @@ class CrystalSystemClassificationTrainer(ContrastiveLearningTrainer):
 
         progress_bar = tqdm(self.train_loader, desc=f'Epoch {epoch+1}')
         for batch_idx, batch in enumerate(progress_bar):
+            # peaks_x, peaks_y, peaks_mask = batch['peaks_x'], batch['peaks_y'], batch['peaks_mask']
+            # labels = batch['labels'].to(self.device, dtype=torch.long)  # 分类任务用long
+            # peaks_x = peaks_x.to(self.device, dtype=self.dtype)
+            # peaks_y = peaks_y.to(self.device, dtype=self.dtype)
+            # peaks_mask = peaks_mask.to(self.device)
+
+            # # 前向传播
+            # logits = self.model(peaks_x, peaks_y, peaks_mask)  # [batch, 7]
+            
+            
             peaks_x, peaks_y, peaks_mask = batch['peaks_x'], batch['peaks_y'], batch['peaks_mask']
-            labels = batch['labels'].to(self.device, dtype=torch.long)  # 分类任务用long
+            formula, formula_mask = batch['formula'], batch['formula_mask']
+            # labels = batch['formation_energy']
+            labels = batch['crystal_system'] # 分类任务用long
             peaks_x = peaks_x.to(self.device, dtype=self.dtype)
             peaks_y = peaks_y.to(self.device, dtype=self.dtype)
             peaks_mask = peaks_mask.to(self.device)
-
-            # 前向传播
-            logits = self.model(peaks_x, peaks_y, peaks_mask)  # [batch, 7]
+            labels = labels.to(self.device, dtype=torch.long)
+            formula, formula_mask = formula.to(self.device), formula_mask.to(self.device)
             
-            # 添加softmax层
-            logits = F.softmax(logits, dim=1)  # [batch, 7]
+            # 前向传播
+            logits = self.model(peaks_x, peaks_y, peaks_mask, formula, formula_mask)
 
             # 计算loss
             loss_fn = torch.nn.CrossEntropyLoss()
@@ -458,13 +472,27 @@ class CrystalSystemClassificationTrainer(ContrastiveLearningTrainer):
         total = 0
 
         for batch in self.val_loader:
+            # peaks_x, peaks_y, peaks_mask = batch['peaks_x'], batch['peaks_y'], batch['peaks_mask']
+            # labels = batch['labels'].to(self.device, dtype=torch.long)
+            # peaks_x = peaks_x.to(self.device, dtype=self.dtype)
+            # peaks_y = peaks_y.to(self.device, dtype=self.dtype)
+            # peaks_mask = peaks_mask.to(self.device)
+
+            # logits = self.model(peaks_x, peaks_y, peaks_mask)
+            
             peaks_x, peaks_y, peaks_mask = batch['peaks_x'], batch['peaks_y'], batch['peaks_mask']
-            labels = batch['labels'].to(self.device, dtype=torch.long)
+            formula, formula_mask = batch['formula'], batch['formula_mask']
+            # labels = batch['formation_energy']
+            labels = batch['crystal_system']
             peaks_x = peaks_x.to(self.device, dtype=self.dtype)
             peaks_y = peaks_y.to(self.device, dtype=self.dtype)
             peaks_mask = peaks_mask.to(self.device)
-
-            logits = self.model(peaks_x, peaks_y, peaks_mask)
+            labels = labels.to(self.device, dtype=torch.long) # 分类任务用long
+            formula, formula_mask = formula.to(self.device), formula_mask.to(self.device)
+            
+            # 前向传播
+            logits = self.model(peaks_x, peaks_y, peaks_mask, formula, formula_mask)            
+            
             loss_fn = torch.nn.CrossEntropyLoss()
             loss = loss_fn(logits, labels)
 
