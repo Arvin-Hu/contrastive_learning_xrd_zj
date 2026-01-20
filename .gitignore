@@ -5,3 +5,7 @@ wandb/**
 *.npy
 *.faiss
 *.log
+
+
+# yayun's gitignore
+yyh
