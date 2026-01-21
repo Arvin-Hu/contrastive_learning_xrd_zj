@@ -78,9 +78,7 @@ class XRDClassificationModel(nn.Module):
         
         logits = self.mlp(xrd_embedding)
         
-        return logits
-    
-    
+        return logits        
 
 class XRDFormulaClassificationModel(nn.Module):
     """
@@ -110,7 +108,7 @@ class XRDFormulaClassificationModel(nn.Module):
         self.formula_embedding = nn.Embedding(formula_vocab_size, embedding_dim)
         
         self.mlp = nn.Sequential(
-            nn.Linear(2 * embedding_dim, 64),
+            nn.Linear(2 * embedding_dim + 8, 64), #  + 8 = 6(lattice) + 1(space_group) + 1(bandgap)
             nn.BatchNorm1d(64),
             nn.ReLU(),
             nn.Linear(64, 32),
@@ -131,8 +129,8 @@ class XRDFormulaClassificationModel(nn.Module):
             elif isinstance(m, nn.BatchNorm1d):
                 nn.init.ones_(m.weight)
                 nn.init.zeros_(m.bias)
-    
-    def forward(self, peaks_x: torch.Tensor, peaks_y: torch.Tensor, peaks_mask: torch.Tensor, formula: torch.Tensor, formula_mask: torch.Tensor) -> torch.Tensor:
+
+    def forward(self, peaks_x: torch.Tensor, peaks_y: torch.Tensor, peaks_mask: torch.Tensor, formula: torch.Tensor, formula_mask: torch.Tensor, lattice_parameter: torch.Tensor, space_group: torch.Tensor, bandgap: torch.Tensor) -> torch.Tensor:
         """
         前向传播
         Args:
@@ -153,8 +151,20 @@ class XRDFormulaClassificationModel(nn.Module):
         formula_mask = torch.logical_not(formula_mask.unsqueeze(-1).repeat(1, 1, emb_dim)).to(formula_embedding.dtype)
         formula_embedding = torch.mul(formula_embedding, formula_mask)
         formula_embedding = torch.sum(formula_embedding, dim=1)
+        
+        # 处理这三个特征
+        # 假设 space_group, bandgap 都是一维 [batch]
+        # lattice_parameter: [batch, 6]
+        extra_features = torch.cat([
+            lattice_parameter,  # [batch, 6]
+            space_group.unsqueeze(1),        # [batch, 1]
+            bandgap.unsqueeze(1)             # [batch, 1]
+        ], dim=1)  # [batch, 8]
 
-        embedding = torch.cat([xrd_embedding, formula_embedding], dim=-1)
+        # embedding = torch.cat([xrd_embedding, formula_embedding], dim=-1)
+        # 拼接到 embedding
+        embedding = torch.cat([xrd_embedding, formula_embedding, extra_features], dim=-1)        
+        
         logits = self.mlp(embedding)
         return logits
     

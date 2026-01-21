@@ -49,7 +49,7 @@ def xrd_collate_fn(batch_data):
     # 初始化batch的padding张量。创建全零的张量用于存放 padding 后的峰值、元素编码等。
     peaks_x_padded_batch = torch.zeros(batch_size, peak_max_len, dtype=batch_data[0]['peaks_x'].dtype)
     peaks_y_padded_batch = torch.zeros(batch_size, peak_max_len, dtype=batch_data[0]['peaks_y'].dtype)
-    peaks_mask = torch.ones(batch_size, peak_max_len, dtype=torch.bool) # True表示padding位置，False表示有效数据位置。初始化为全True。
+    peaks_mask = torch.ones(batch_size, peak_max_len, dtype=torch.bool) # True表示padding位置，False表示有效数据位置。初始化为全True。    
     
     formulas_padded_batch = torch.zeros(batch_size, formula_max_len, dtype=batch_data[0]['formula'].dtype)
     formulas_mask = torch.ones(batch_size, formula_max_len, dtype=torch.bool)
@@ -67,6 +67,7 @@ def xrd_collate_fn(batch_data):
         formation_energies.append(data['formation_energy'])
         bandgaps.append(data['bandgap'])
         lattice_parameters.append(data['lattice_parameter'])
+        space_groups.append(data['space_group'])
         
         peak_seq_len = peaks_n.item()
         if peak_seq_len > 0:
@@ -80,7 +81,9 @@ def xrd_collate_fn(batch_data):
     xrd_input_batch = torch.stack(xrd_tensors, dim=0)
     crystal_systems_batch = torch.stack(crystal_systems, dim=0)
     formation_energies_batch = torch.stack(formation_energies, dim=0)
-    lattice_parameters_batch = torch.stack(lattice_parameters, dim=0)
+    bandgaps_batch = torch.stack(bandgaps, dim=0)
+    space_groups_batch = torch.stack(space_groups, dim=0)
+    lattice_parameters_batch = torch.stack(lattice_parameters, dim=0) # [batch, 6]
     
     return {
             'xrd_input': xrd_input_batch, 
@@ -90,10 +93,11 @@ def xrd_collate_fn(batch_data):
             'peaks_y': peaks_y_padded_batch, 
             'peaks_mask': peaks_mask, 
             'formation_energy': formation_energies_batch,
-            'bandgap': bandgaps,
+            'bandgap': bandgaps_batch,
             'formula': formulas_padded_batch,
             'formula_mask': formulas_mask,
-            'lattice_parameter': lattice_parameters,
+            'lattice_parameter': lattice_parameters_batch,
+            'space_group': space_groups_batch
             }
 
 
@@ -156,8 +160,8 @@ class XRDFullDataset(Dataset):
         bandgap = torch.tensor(self.bandgaps[idx], dtype=torch.float32)
         encoded = self.formula_encoder.encode_formula(self.formulas[idx])
         formula = torch.tensor(encoded, dtype=torch.int64)
-        lattice_parameter = torch.tensor(self.lattice_parameters[idx], dtype=torch.float32)
-        # space_group = torch.tensor(self.space_groups[idx], dtype=torch.float32)
+        lattice_parameter = torch.tensor(self.lattice_parameters[idx], dtype=torch.float32)  # shape [6]
+        space_group = torch.tensor(0.0, dtype=torch.float32) # 解释：space_group是string字符串，无法直接变成float32表示，可能是为了后续计算方便。self.space_groups[idx] == 0.0，强行不是用这个feature。
         formation_energy = torch.tensor(self.formation_energies[idx], dtype=torch.float32)
         return {'xrd_input': xrd_emb, 
                 'xrd_file': self.xrd_files[idx],
@@ -168,7 +172,7 @@ class XRDFullDataset(Dataset):
                 'crystal_system': crystal_system,
                 'formula': formula,
                 'lattice_parameter': lattice_parameter,
-                # 'space_group': space_group,
+                'space_group': space_group,
                 'bandgap': bandgap
                 }
     

@@ -169,6 +169,9 @@ class ContrastiveLearningTrainer:
             train_loss = self.train_epoch(epoch)
             val_loss = self.validate(epoch)
             
+            # 展示显存占用
+            # print(torch.cuda.memory_summary())
+            
             # 更新学习率
             self.scheduler.step()
             
@@ -420,16 +423,25 @@ class CrystalSystemClassificationTrainer(ContrastiveLearningTrainer):
             peaks_x, peaks_y, peaks_mask = batch['peaks_x'], batch['peaks_y'], batch['peaks_mask']
             formula, formula_mask = batch['formula'], batch['formula_mask']
             # labels = batch['formation_energy']
-            labels = batch['crystal_system'] # 分类任务用long
+            lattice_parameter = batch['lattice_parameter']
+            space_group = batch['space_group']
+            bandgap = batch['bandgap']
+            labels = batch['crystal_system'] 
+            
+            # 统一 device        
             peaks_x = peaks_x.to(self.device, dtype=self.dtype)
             peaks_y = peaks_y.to(self.device, dtype=self.dtype)
             peaks_mask = peaks_mask.to(self.device)
-            labels = labels.to(self.device, dtype=torch.long)
             formula, formula_mask = formula.to(self.device), formula_mask.to(self.device)
+            lattice_parameter = lattice_parameter.to(self.device, dtype=self.dtype)
+            space_group = space_group.to(self.device, dtype=torch.long)
+            bandgap = bandgap.to(self.device, dtype=self.dtype)
+            labels = labels.to(self.device, dtype=torch.long) # 分类任务用long。作为对比，单精度预测使用 self.dtype
             
             # 前向传播
-            logits = self.model(peaks_x, peaks_y, peaks_mask, formula, formula_mask)
-
+            logits = self.model(peaks_x, peaks_y, peaks_mask, formula, formula_mask,
+                                lattice_parameter, space_group, bandgap)  # [batch, 7]
+            
             # 计算loss
             loss_fn = torch.nn.CrossEntropyLoss()
             loss = loss_fn(logits, labels)
@@ -480,18 +492,41 @@ class CrystalSystemClassificationTrainer(ContrastiveLearningTrainer):
 
             # logits = self.model(peaks_x, peaks_y, peaks_mask)
             
+            # peaks_x, peaks_y, peaks_mask = batch['peaks_x'], batch['peaks_y'], batch['peaks_mask']
+            # formula, formula_mask = batch['formula'], batch['formula_mask']
+            # # labels = batch['formation_energy']
+            # peaks_x = peaks_x.to(self.device, dtype=self.dtype)
+            # peaks_y = peaks_y.to(self.device, dtype=self.dtype)
+            # peaks_mask = peaks_mask.to(self.device)
+            # formula, formula_mask = formula.to(self.device), formula_mask.to(self.device)
+            # lattice_parameter = batch['lattice_parameter']
+            # space_group = batch['space_group']
+            # bandgap = batch['bandgap']
+            # labels = batch['crystal_system']
+            # labels = labels.to(self.device, dtype=torch.long) # 分类任务用long
+            
             peaks_x, peaks_y, peaks_mask = batch['peaks_x'], batch['peaks_y'], batch['peaks_mask']
             formula, formula_mask = batch['formula'], batch['formula_mask']
             # labels = batch['formation_energy']
-            labels = batch['crystal_system']
+            lattice_parameter = batch['lattice_parameter']
+            space_group = batch['space_group']
+            bandgap = batch['bandgap']
+            labels = batch['crystal_system'] 
+            
+            # 统一 device        
             peaks_x = peaks_x.to(self.device, dtype=self.dtype)
             peaks_y = peaks_y.to(self.device, dtype=self.dtype)
             peaks_mask = peaks_mask.to(self.device)
-            labels = labels.to(self.device, dtype=torch.long) # 分类任务用long
             formula, formula_mask = formula.to(self.device), formula_mask.to(self.device)
+            lattice_parameter = lattice_parameter.to(self.device, dtype=self.dtype)
+            space_group = space_group.to(self.device, dtype=torch.long)
+            bandgap = bandgap.to(self.device, dtype=self.dtype)
+            labels = labels.to(self.device, dtype=torch.long) # 分类任务用long。作为对比，单精度预测使用 self.dtype
+                        
             
             # 前向传播
-            logits = self.model(peaks_x, peaks_y, peaks_mask, formula, formula_mask)            
+            logits = self.model(peaks_x, peaks_y, peaks_mask, formula, formula_mask,
+                                lattice_parameter, space_group, bandgap)  # [batch, 7]           
             
             loss_fn = torch.nn.CrossEntropyLoss()
             loss = loss_fn(logits, labels)
