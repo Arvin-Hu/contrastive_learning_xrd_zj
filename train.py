@@ -1,7 +1,7 @@
 import numpy as np
 from models.model import ContrastiveLearningModel
 from trainer import ContrastiveLearningTrainer
-from dataset import DataAugmentation, ContrastiveLearningDataset, collate_fn
+from dataset.dataset import DataAugmentation, ContrastiveLearningDataset, collate_fn
 import torch
 from torch.utils.data import DataLoader
 

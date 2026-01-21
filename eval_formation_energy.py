@@ -3,7 +3,7 @@ import os
 from tqdm import tqdm
 import sys
 from models.reg_model import XRDRegressionModel
-from reg_dataset import XRDDataset, collate_fn
+from dataset.reg_dataset import XRDDataset, collate_fn
 import torch
 from torch.utils.data import DataLoader
 from sklearn.metrics import r2_score

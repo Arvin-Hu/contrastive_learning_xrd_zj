@@ -19,11 +19,12 @@ torchrun --nproc_per_node=${NPROC_PER_NODE} \
          --master_addr=${MASTER_ADDR} \
          --master_port=${MASTER_PORT} \
          --rdzv_conf timeout=6000 \
-         train_crystal.py \
+         train_crystalsystem.py \
          --learning_rate 1e-4 \
-         --epochs 60 \
-         --batch_size 512 \
+         --epochs 90 \
+         --batch_size 1024 \
          --embedding_dim 256 \
+         --log_dir runs/crystal_system_logs \
          --output_path /mnt/minio/battery/xrd/train_outputs/xrd/crystal_system/v1 \
          --train_path /mnt/minio/battery/xrd/datasets/MP_crystalsystem_QA_train.jsonl  \
          --eval_path /mnt/minio/battery/xrd/datasets/MP_crystalsystem_QA_test.jsonl \

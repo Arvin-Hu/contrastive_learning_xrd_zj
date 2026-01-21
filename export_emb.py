@@ -1,7 +1,7 @@
 from trainer import ContrastiveLearningTrainer
 from models.model import ContrastiveLearningModel
 import torch
-from dataset import ContrastiveLearningDataset, collate_fn
+from dataset.dataset import ContrastiveLearningDataset, collate_fn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 import os

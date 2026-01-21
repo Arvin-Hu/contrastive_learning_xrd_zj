@@ -3,14 +3,14 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
-from torch.utils.tensorboard import SummaryWriter
 import numpy as np
 from typing import Optional, Tuple, List
 from models.model import ContrastiveLoss
-from sklearn.metrics import r2_score
 from tqdm import tqdm
 import os
-
+from torch.utils.tensorboard import SummaryWriter
+import datetime
+from sklearn.metrics import r2_score
 import gc
 
 def debug_memory():
@@ -44,7 +44,8 @@ class ContrastiveLearningTrainer:
                  learning_rate: float = 1e-4,
                  weight_decay: float = 1e-4,
                  temperature: float = 0.1,
-                 device: str = 'cuda' if torch.cuda.is_available() else 'cpu'):
+                 device: str = 'cuda' if torch.cuda.is_available() else 'cpu',
+                 log_dir=None):
         
         self.model = model.to(device)
         self.train_loader = train_loader
@@ -54,6 +55,10 @@ class ContrastiveLearningTrainer:
         self.temperature = temperature
         self.dtype=next(self.model.parameters()).dtype
         self.start_epoch = 0
+        
+        # tensorboard日志记录器。记录到模型同级的logs文件夹中
+        self.log_dir = log_dir  # 先保存，不初始化writer
+        self.writer = None
         
         # 优化器
         self.optimizer = optim.AdamW(
@@ -101,7 +106,7 @@ class ContrastiveLearningTrainer:
             # 反向传播
             self.optimizer.zero_grad()
             loss.backward()
-            nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
+            torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
             self.optimizer.step()
             
             batch_count += 1
@@ -114,7 +119,7 @@ class ContrastiveLearningTrainer:
         return avg_loss
     
     @torch.no_grad()
-    def validate(self) -> Optional[float]:
+    def validate(self, epoch) -> Optional[float]:
         """验证"""
         if self.val_loader is None:
             return None
@@ -147,48 +152,56 @@ class ContrastiveLearningTrainer:
     def train(self, num_epochs: int, save_path: Optional[str] = None):
         """训练循环"""
         print("开始训练...")
-        if save_path:
-            print(f"模型数据存储文件夹: {save_path}")
-            os.makedirs(save_path, exist_ok=True)
-        
-        with SummaryWriter() as writer:
-            current_abs = os.path.abspath(os.getcwd())
-            folder1_path = os.path.join(current_abs, "runs")
-            print(f"TensorBoard SummaryWriter 存储文件夹: {folder1_path}")
-            if self.start_epoch > 0: # some epochs has been trained before, write to TensorBoard
-                for old_epoch in range(self.start_epoch):
-                    writer.add_scalar("train_loss", self.history['train_loss'][old_epoch], old_epoch)
-                    writer.add_scalar("val_loss", self.history['val_loss'][old_epoch], old_epoch)
-                    writer.flush()
-            for epoch in range(self.start_epoch, num_epochs):
-                train_loss = self.train_epoch(epoch)
-                writer.add_scalar("train_loss", train_loss, epoch)
-                val_loss = self.validate()
-                writer.add_scalar("val_loss", val_loss, epoch)
-                writer.flush()
+    
+        print("save_path:", save_path)
+        assert save_path is not None, "save_path 不能为空！"
 
-                # 更新学习率
-                self.scheduler.step()
-                
-                # 打印进度
-                if val_loss is not None:
-                    print(f"Epoch {epoch+1}/{num_epochs} | "
-                        f"Train Loss: {train_loss:.4f} | "
-                        f"Val Loss: {val_loss:.4f} | "
-                        f"LR: {self.optimizer.param_groups[0]['lr']:.6f}")
-                else:
-                    print(f"Epoch {epoch+1}/{num_epochs} | "
-                        f"Train Loss: {train_loss:.4f} | "
-                        f"LR: {self.optimizer.param_groups[0]['lr']:.6f}")
-                
-                # 保存模型
-                if save_path:
-                    self.save_model(os.path.join(save_path, f"epoch_{epoch+1}.pth"), epoch)
+        print("self.log_dir:", self.log_dir)
+
+        # 根据 save_path 设置 tensorboard 日志目录
+        if save_path:
+            log_dir = os.path.join(save_path, self.log_dir, datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
+        else:
+            log_dir = self.log_dir or "logs"
+        self.writer = SummaryWriter(log_dir=log_dir)                
+        
+        for epoch in range(self.start_epoch, num_epochs):
+            train_loss = self.train_epoch(epoch)
+            val_loss = self.validate(epoch)
             
+            # 更新学习率
+            self.scheduler.step()
+            
+            # 打印进度
+            if val_loss is not None:
+                print(f"Epoch {epoch+1}/{num_epochs} | "
+                      f"Train Loss: {train_loss:.4f} | "
+                      f"Val Loss: {val_loss:.4f} | "
+                      f"LR: {self.optimizer.param_groups[0]['lr']:.6f}")
+            else:
+                print(f"Epoch {epoch+1}/{num_epochs} | "
+                      f"Train Loss: {train_loss:.4f} | "
+                      f"LR: {self.optimizer.param_groups[0]['lr']:.6f}")
+            
+            # 记录到 tensorboard
+            self.writer.add_scalar('Loss/train', train_loss, epoch)
+            if val_loss is not None:
+                self.writer.add_scalar('Loss/val', val_loss, epoch)
+            self.writer.add_scalar('LearningRate', self.optimizer.param_groups[0]['lr'], epoch)
+            
+            self.writer.flush()
+            
+            # 保存模型
+            if save_path:
+                if not os.path.exists(save_path):
+                    os.makedirs(save_path)
+                self.save_model(os.path.join(save_path, f"epoch_{epoch+1}.pth"), epoch)
         
         if save_path:
             self.save_model(os.path.join(save_path, f"final.pth"), epoch)
-        
+
+        self.writer.close() # 关闭tensorboard writer
+
         print("训练完成！")
     
     def save_model(self, path: str, epoch: int=0):
@@ -232,13 +245,13 @@ class RegressionTrainer(ContrastiveLearningTrainer):
             logits = self.model(peaks_x, peaks_y, peaks_mask)
             
             # 计算loss
-            loss_fn = nn.MSELoss()
+            loss_fn = torch.nn.L1Loss()
             loss = loss_fn(logits.squeeze(1), labels)
             
             # 反向传播
             self.optimizer.zero_grad()
             loss.backward()
-            nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
+            torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
             self.optimizer.step()
             
             batch_count += 1
@@ -272,7 +285,7 @@ class RegressionTrainer(ContrastiveLearningTrainer):
             logits = self.model(peaks_x, peaks_y, peaks_mask)
             
             # 计算loss
-            loss_fn = nn.MSELoss()
+            loss_fn = torch.nn.MSELoss()
             loss = loss_fn(logits.squeeze(1), labels)
             
             total_loss += loss.item()
@@ -294,6 +307,95 @@ class RegressionTrainer(ContrastiveLearningTrainer):
         
         return avg_loss
     
+    
+class FormationEnergyTrainer(RegressionTrainer):
+    def train_epoch(self, epoch) -> float:
+        """训练一个epoch"""
+        self.model.train()
+        total_loss = 0
+        batch_count = 0
+        
+        progress_bar = tqdm(self.train_loader, desc=f'Epoch {epoch+1}')
+        for batch in progress_bar:
+            peaks_x, peaks_y, peaks_mask = batch['peaks_x'], batch['peaks_y'], batch['peaks_mask']
+            formula, formula_mask = batch['formula'], batch['formula_mask']
+            labels = batch['formation_energy']
+            peaks_x = peaks_x.to(self.device, dtype=self.dtype)
+            peaks_y = peaks_y.to(self.device, dtype=self.dtype)
+            peaks_mask = peaks_mask.to(self.device)
+            labels = labels.to(self.device, dtype=self.dtype)
+            formula, formula_mask = formula.to(self.device), formula_mask.to(self.device)
+            
+            # 前向传播
+            logits = self.model(peaks_x, peaks_y, peaks_mask, formula, formula_mask)
+            
+            # 计算loss
+            loss_fn = torch.nn.L1Loss()
+            loss = loss_fn(logits.squeeze(1), labels)
+            
+            # 反向传播
+            self.optimizer.zero_grad()
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
+            self.optimizer.step()
+            
+            batch_count += 1
+            total_loss += loss.item()
+                    
+        avg_loss = total_loss / batch_count
+        self.history['train_loss'].append(avg_loss)
+        self.history['learning_rate'].append(self.optimizer.param_groups[0]['lr'])
+        
+        return avg_loss
+    
+    @torch.no_grad()
+    def validate(self) -> Optional[float]:
+        """验证"""
+        if self.val_loader is None:
+            return None
+        
+        self.model.eval()
+        total_loss = 0
+        batch_count = 0
+        label_list, pred_list = [], []
+        for batch in self.val_loader:
+            peaks_x, peaks_y, peaks_mask = batch['peaks_x'], batch['peaks_y'], batch['peaks_mask']
+            formula, formula_mask = batch['formula'], batch['formula_mask']
+            labels = batch['formation_energy']
+            peaks_x = peaks_x.to(self.device, dtype=self.dtype)
+            peaks_y = peaks_y.to(self.device, dtype=self.dtype)
+            peaks_mask = peaks_mask.to(self.device)
+            labels = labels.to(self.device, dtype=self.dtype)
+            formula, formula_mask = formula.to(self.device), formula_mask.to(self.device)
+            
+            # 前向传播
+            logits = self.model(peaks_x, peaks_y, peaks_mask, formula, formula_mask)
+            
+            # 计算loss
+            loss_fn = torch.nn.MSELoss()
+            loss = loss_fn(logits.squeeze(1), labels)
+            
+            total_loss += loss.item()
+            batch_count += 1
+            
+            logits = logits.cpu().detach().numpy()
+            labels = labels.cpu().detach().numpy()
+            
+            label_list.extend(labels.reshape(-1).tolist())
+            pred_list.extend(logits.reshape(-1).tolist())
+            
+        
+        r2 = r2_score(np.array(label_list), np.array(pred_list))
+        mae = np.abs(np.array(label_list) - np.array(pred_list)).mean()
+        print('r2: {}, mae: {}'.format(r2, mae))
+        
+        avg_loss = total_loss / batch_count
+        self.history['val_loss'].append(avg_loss)
+        
+        return avg_loss
+    
+    
+    
 class CrystalSystemClassificationTrainer(ContrastiveLearningTrainer):
     def train_epoch(self, epoch) -> float:
         """训练一个epoch"""
@@ -304,28 +406,46 @@ class CrystalSystemClassificationTrainer(ContrastiveLearningTrainer):
         total = 0
 
         progress_bar = tqdm(self.train_loader, desc=f'Epoch {epoch+1}')
-        for batch in progress_bar:
+        for batch_idx, batch in enumerate(progress_bar):
+            # peaks_x, peaks_y, peaks_mask = batch['peaks_x'], batch['peaks_y'], batch['peaks_mask']
+            # labels = batch['labels'].to(self.device, dtype=torch.long)  # 分类任务用long
+            # peaks_x = peaks_x.to(self.device, dtype=self.dtype)
+            # peaks_y = peaks_y.to(self.device, dtype=self.dtype)
+            # peaks_mask = peaks_mask.to(self.device)
+
+            # # 前向传播
+            # logits = self.model(peaks_x, peaks_y, peaks_mask)  # [batch, 7]
+            
+            
             peaks_x, peaks_y, peaks_mask = batch['peaks_x'], batch['peaks_y'], batch['peaks_mask']
-            labels = batch['labels'].to(self.device, dtype=torch.long)  # 分类任务用long
+            formula, formula_mask = batch['formula'], batch['formula_mask']
+            # labels = batch['formation_energy']
+            labels = batch['crystal_system'] # 分类任务用long
             peaks_x = peaks_x.to(self.device, dtype=self.dtype)
             peaks_y = peaks_y.to(self.device, dtype=self.dtype)
             peaks_mask = peaks_mask.to(self.device)
-
+            labels = labels.to(self.device, dtype=torch.long)
+            formula, formula_mask = formula.to(self.device), formula_mask.to(self.device)
+            
             # 前向传播
-            logits = self.model(peaks_x, peaks_y, peaks_mask)  # [batch, 7]
+            logits = self.model(peaks_x, peaks_y, peaks_mask, formula, formula_mask)
 
             # 计算loss
-            loss_fn = nn.CrossEntropyLoss()
+            loss_fn = torch.nn.CrossEntropyLoss()
             loss = loss_fn(logits, labels)
 
             # 反向传播
             self.optimizer.zero_grad()
             loss.backward()
-            nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
+            torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
             self.optimizer.step()
 
+            # 记录每个batch的loss到tensorboard
+            if self.writer is not None:
+                self.writer.add_scalar('Loss/batch', loss.item(), epoch * len(self.train_loader) + batch_idx)
+
             batch_count += 1
-            total_loss += loss.item()
+            total_loss += loss.item() # 累计损失。语法：loss.item()代表获取loss的数值，为什么是累加？因为要计算平均损失
 
             # 统计准确率
             preds = logits.argmax(dim=1)
@@ -340,7 +460,7 @@ class CrystalSystemClassificationTrainer(ContrastiveLearningTrainer):
         return avg_loss
 
     @torch.no_grad()
-    def validate(self) -> Optional[float]:
+    def validate(self, epoch) -> Optional[float]:
         """验证"""
         if self.val_loader is None:
             return None
@@ -351,16 +471,34 @@ class CrystalSystemClassificationTrainer(ContrastiveLearningTrainer):
         correct = 0
         total = 0
 
-        for batch in self.val_loader:
+        for batch_idx, batch in enumerate(self.val_loader):
+            # peaks_x, peaks_y, peaks_mask = batch['peaks_x'], batch['peaks_y'], batch['peaks_mask']
+            # labels = batch['labels'].to(self.device, dtype=torch.long)
+            # peaks_x = peaks_x.to(self.device, dtype=self.dtype)
+            # peaks_y = peaks_y.to(self.device, dtype=self.dtype)
+            # peaks_mask = peaks_mask.to(self.device)
+
+            # logits = self.model(peaks_x, peaks_y, peaks_mask)
+            
             peaks_x, peaks_y, peaks_mask = batch['peaks_x'], batch['peaks_y'], batch['peaks_mask']
-            labels = batch['labels'].to(self.device, dtype=torch.long)
+            formula, formula_mask = batch['formula'], batch['formula_mask']
+            # labels = batch['formation_energy']
+            labels = batch['crystal_system']
             peaks_x = peaks_x.to(self.device, dtype=self.dtype)
             peaks_y = peaks_y.to(self.device, dtype=self.dtype)
             peaks_mask = peaks_mask.to(self.device)
-
-            logits = self.model(peaks_x, peaks_y, peaks_mask)
-            loss_fn = nn.CrossEntropyLoss()
+            labels = labels.to(self.device, dtype=torch.long) # 分类任务用long
+            formula, formula_mask = formula.to(self.device), formula_mask.to(self.device)
+            
+            # 前向传播
+            logits = self.model(peaks_x, peaks_y, peaks_mask, formula, formula_mask)            
+            
+            loss_fn = torch.nn.CrossEntropyLoss()
             loss = loss_fn(logits, labels)
+            
+            # 记录每个batch的loss到tensorboard
+            if self.writer is not None:
+                self.writer.add_scalar('Loss/batch_val', loss.item(), epoch * len(self.val_loader) + batch_idx)
 
             total_loss += loss.item()
             batch_count += 1
@@ -373,4 +511,9 @@ class CrystalSystemClassificationTrainer(ContrastiveLearningTrainer):
         acc = correct / total if total > 0 else 0
         self.history['val_loss'].append(avg_loss)
         print(f"Val Accuracy: {acc:.4f}")
+        
+        # 记录到tensorboard
+        if self.writer is not None:
+            self.writer.add_scalar('Accuracy/val', acc, epoch)
+        
         return avg_loss

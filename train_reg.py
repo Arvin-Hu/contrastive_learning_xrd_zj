@@ -1,7 +1,7 @@
 import numpy as np
 from models.reg_model import XRDRegressionModel
 from trainer import RegressionTrainer
-from reg_dataset import XRDDataset, collate_fn
+from dataset.reg_dataset import XRDDataset, collate_fn
 import torch
 from torch.utils.data import DataLoader
 
