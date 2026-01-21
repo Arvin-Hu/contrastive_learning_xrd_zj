@@ -168,7 +168,7 @@ class ContrastiveLearningDataset(Dataset):
     
 if __name__ == '__main__':
     from torch.utils.data import DataLoader
-    from model import ContrastiveLearningModel
+    from models.model import ContrastiveLearningModel
     dataset = ContrastiveLearningDataset(
         cif_path='/mnt/minio/battery/xrd/datasets/raw_data/mp_cif_npy',
         xrd_path='/mnt/minio/battery/xrd/datasets/raw_data/mp_xrd',

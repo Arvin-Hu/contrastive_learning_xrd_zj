@@ -178,7 +178,7 @@ if __name__ == '__main__':
         xrd_path='/mnt/minio/battery/xrd/datasets/raw_data/mp_xrd',
         json_path='/mnt/minio/battery/xrd/datasets/MP_xrd-test.jsonl'
     )
-    train_loader = DataLoader(dataset, batch_size=2, shuffle=True, collate_fn=collate_fn)
+    train_loader = DataLoader(dataset, batch_size=2, shuffle=True, collate_fn=xrd_collate_fn)
     model = XRDFormulaModel().to(torch.float32)
     for batch in train_loader:
         for key in batch:
