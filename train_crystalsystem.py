@@ -13,6 +13,11 @@ from torch.utils.data import DataLoader
 
 def train(
     output_path,
+    model_class,
+    trainer_class,
+    train_path,
+    eval_path,
+    log_dir,
     batch_size=128, 
     learning_rate=1e-4, 
     weight_decay=1e-4, 
@@ -20,12 +25,7 @@ def train(
     epochs=30,
     num_heads=8,
     num_layers=6,
-    model_path=None,
-    train_path=None,
-    eval_path=None,
-    log_dir="logs",
-    model_class='XRDFormulaModel',
-    trainer_class='RegressionTrainer'
+    model_path=None
 ):
     
     # 3. 创建数据集和数据加载器
@@ -124,11 +124,11 @@ if __name__ == '__main__':
     parser.add_argument('--num_layers', type=int, default=6)
     parser.add_argument('--output_path', type=str)
     parser.add_argument('--model_path', type=str, default=None)
-    parser.add_argument('--train_path', type=str, default=None)
-    parser.add_argument('--eval_path', type=str, default=None)
-    parser.add_argument('--log_dir', type=str, default="logs")
-    parser.add_argument('--model_class', type=str, default='XRDFormulaModel')
-    parser.add_argument('--trainer_class', type=str, default='FormationEnergyTrainer')
+    parser.add_argument('--train_path', type=str)
+    parser.add_argument('--eval_path', type=str)
+    parser.add_argument('--log_dir', type=str)
+    parser.add_argument('--model_class', type=str)
+    parser.add_argument('--trainer_class', type=str)
     
 
     
