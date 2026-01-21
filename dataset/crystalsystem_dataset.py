@@ -14,16 +14,20 @@ from utils.formula import ElementEncoder
 
 
 def get_peaks(y):
+    """Use find_peaks of scipy.signal module to return the number of peaks, relative angle and
+    relative intensity,"""
     start = 5
     end = 80
     points_per_interval = 50
     # 计算总点数（75个区间，每个区间50个点，加上最后一个端点）
-    total_points = (end - start) * points_per_interval
+    # xrd-file 角度从5到80，步进0.02度，包含终点
+    total_points = (end - start) * points_per_interval + 1
+    # angels is in fact shrinked angle [5, 80] → [0.05, 0.80] 
     angels = np.linspace(start, end, total_points) / 100
     peaks = find_peaks(y, height=0.01, prominence=0.02)[0]
-    peak_x = angels[peaks]
-    peak_y = y[peaks]
-    peak_n = len(peak_x)
+    peak_x = angels[peaks]  # variable size
+    peak_y = y[peaks]  # variable size
+    peak_n = len(peak_x)    # int
     return peaks, peak_x, peak_y, peak_n
 
 
@@ -125,25 +129,24 @@ class XRDFullDataset(Dataset):
                 # try:
                 data = json.loads(line)
                 filename = data['xrd']
-                xrd_files.append(os.path.join(xrd_path, filename))
-                # crystal_systems.append(data['crystal_system'])
-                crystal_systems.append(csdict[data['crystal_system']]) # 
-                bandgaps.append(data['bandgap'])
-                formulas.append(data['formula'])
-                lattice_parameters.append(data['lattice_parameters'])
-                space_groups.append(data['space_group'])
-                formation_energies.append(data['formation_energy'])
+                xrd_files.append(os.path.join(xrd_path, filename))      # variable sized str
+                crystal_systems.append(csdict[data['crystal_system']])  # int
+                bandgaps.append(data['bandgap'])    # float
+                formulas.append(data['formula'])    # variable sized str
+                lattice_parameters.append(data['lattice_parameters'])   # list of 6 float
+                space_groups.append(data['space_group'])    # variable sized str
+                formation_energies.append(data['formation_energy']) # float
                 # except:
                 #     print('Error skip line')
                 #     continue
         
-        self.xrd_files = np.array(xrd_files)
-        self.crystal_systems = np.array(crystal_systems)
-        self.bandgaps = np.array(bandgaps)
-        self.formulas = np.array(formulas)
-        self.lattice_parameters = np.array(lattice_parameters)
-        self.space_groups = np.array(space_groups)
-        self.formation_energies = np.array(formation_energies)
+        self.xrd_files = np.array(xrd_files)    # numpy array can accept variable sized str (num_samples,)
+        self.crystal_systems = np.array(crystal_systems)    # numpy array of int (num_samples,)
+        self.bandgaps = np.array(bandgaps)  # numpy array of float (num_samples,)
+        self.formulas = np.array(formulas)  # numpy array can accept variable sized str (num_samples,)
+        self.lattice_parameters = np.array(lattice_parameters)  # float (num_samples, 6)
+        self.space_groups = np.array(space_groups)  # str (num_samples,)
+        self.formation_energies = np.array(formation_energies)  # float (num_samples,)
         self.formula_encoder = ElementEncoder()
         print('finish init dataset, dataset size: {}'.format(len(self.xrd_files)))
         
@@ -173,16 +176,19 @@ class XRDFullDataset(Dataset):
                 }
     
     def get_xrd_embeddings(self, xrd_path):
+        """
+        Read XRD data from a JSON file and extract intensity and peak information.
+        """
         with open(xrd_path, 'r') as f:
-            data = json.load(f)
+            data = json.load(f) # xrd data json keys: two_theta, intensity, finename, tth_range, peak_count
         y = np.array(data['intensity'])
-        y = (y - np.min(y)) / (np.max(y) - np.min(y))   
+        y = (y - np.min(y)) / (np.max(y) - np.min(y))   # scaled intensity to [0, 1]
         
         peaks, peaks_x, peaks_y, peaks_n = get_peaks(y)
-        peaks_x = torch.tensor(np.array(peaks_x), dtype=torch.float32)
-        peaks_y = torch.tensor(np.array(peaks_y), dtype=torch.float32)
-        peaks_n = torch.tensor(peaks_n, dtype=torch.long)
-        embeddings = torch.tensor(np.array(data['intensity']), dtype=torch.float32)
+        peaks_x = torch.tensor(np.array(peaks_x), dtype=torch.float32)  # variable length
+        peaks_y = torch.tensor(np.array(peaks_y), dtype=torch.float32)  # variable length
+        peaks_n = torch.tensor(peaks_n, dtype=torch.long)   # int
+        embeddings = torch.tensor(np.array(data['intensity']), dtype=torch.float32) # fixed length
         
         return embeddings, peaks_x, peaks_y, peaks_n
 
