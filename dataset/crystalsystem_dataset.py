@@ -49,6 +49,7 @@ def xrd_collate_fn(batch_data):
     formulas = []
     lattice_parameters = []
     space_groups = []
+    densities = []
     
     # 初始化batch的padding张量。创建全零的张量用于存放 padding 后的峰值、元素编码等。
     peaks_x_padded_batch = torch.zeros(batch_size, peak_max_len, dtype=batch_data[0]['peaks_x'].dtype)
@@ -72,6 +73,7 @@ def xrd_collate_fn(batch_data):
         bandgaps.append(data['bandgap'])
         lattice_parameters.append(data['lattice_parameter'])
         space_groups.append(data['space_group'])
+        densities.append(data['density'])
         
         peak_seq_len = peaks_n.item()
         if peak_seq_len > 0:
@@ -88,6 +90,7 @@ def xrd_collate_fn(batch_data):
     bandgaps_batch = torch.stack(bandgaps, dim=0)
     space_groups_batch = torch.stack(space_groups, dim=0)
     lattice_parameters_batch = torch.stack(lattice_parameters, dim=0) # [batch, 6]
+    densities_batch = torch.stack(densities, dim=0)
     
     return {
             'xrd_input': xrd_input_batch, 
@@ -101,7 +104,8 @@ def xrd_collate_fn(batch_data):
             'formula': formulas_padded_batch,
             'formula_mask': formulas_mask,
             'lattice_parameter': lattice_parameters_batch,
-            'space_group': space_groups_batch
+            'space_group': space_groups_batch,
+            'density': densities_batch
             }
 
 
@@ -119,6 +123,7 @@ class XRDFullDataset(Dataset):
         formulas = []
         lattice_parameters = []
         space_groups = []
+        density = []
         
         csdict = {"triclinic": 0,
             "monoclinic": 1,
@@ -140,6 +145,7 @@ class XRDFullDataset(Dataset):
                 lattice_parameters.append(data['lattice_parameters'])   # list of 6 float
                 space_groups.append(data['space_group'])    # variable sized str
                 formation_energies.append(data['formation_energy']) # float
+                density.append(data['density'])
                 # except:
                 #     print('Error skip line')
                 #     continue
@@ -151,21 +157,24 @@ class XRDFullDataset(Dataset):
         self.lattice_parameters = np.array(lattice_parameters)  # float (num_samples, 6)
         self.space_groups = np.array(space_groups)  # str (num_samples,)
         self.formation_energies = np.array(formation_energies)  # float (num_samples,)
-        self.formula_encoder = ElementEncoder()
+        self.density = np.array(density)
         print('finish init dataset, dataset size: {}'.format(len(self.xrd_files)))
+        self.formula_encoder = ElementEncoder()
         
     def __len__(self):
         return len(self.xrd_files)
     
     def __getitem__(self, idx): # 每个样本是字典，包含XRD、峰值、晶体系统等。返回是batch_data的元素。
         xrd_emb, peaks_x, peaks_y, peaks_n = self.get_xrd_embeddings(self.xrd_files[idx])
-        crystal_system = torch.tensor(self.crystal_systems[idx], dtype=torch.float32)
+        crystal_system = torch.tensor(self.crystal_systems[idx], dtype=torch.int64)
         bandgap = torch.tensor(self.bandgaps[idx], dtype=torch.float32)
         encoded = self.formula_encoder.encode_formula(self.formulas[idx])
         formula = torch.tensor(encoded, dtype=torch.int64)
-        lattice_parameter = torch.tensor(self.lattice_parameters[idx], dtype=torch.float32)  # shape [6]
+        # lattice_parameter = torch.tensor(self.lattice_parameters[idx], dtype=torch.float32)  # shape [6]
+        lattice_parameter = torch.tensor(np.zeros(6), dtype=torch.float32)  # shape [6]
         space_group = torch.tensor(0.0, dtype=torch.float32) # 解释：space_group是string字符串，无法直接变成float32表示，可能是为了后续计算方便。self.space_groups[idx] == 0.0，强行不是用这个feature。
         formation_energy = torch.tensor(self.formation_energies[idx], dtype=torch.float32)
+        density = torch.tensor(self.density[idx], dtype=torch.float32)
         return {'xrd_input': xrd_emb, 
                 'xrd_file': self.xrd_files[idx],
                 'peaks_x': peaks_x, 
@@ -176,7 +185,8 @@ class XRDFullDataset(Dataset):
                 'formula': formula,
                 'lattice_parameter': lattice_parameter,
                 'space_group': space_group,
-                'bandgap': bandgap
+                'bandgap': bandgap,
+                'density': density
                 }
     
     def get_xrd_embeddings(self, xrd_path):
