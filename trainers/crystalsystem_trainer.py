@@ -228,6 +228,276 @@ class ContrastiveLearningTrainer:
 
 
 
+class DoubleAimContrastiveLearningTrainer(ContrastiveLearningTrainer):
+    def train(self, num_epochs: int, save_path: Optional[str] = None):
+        """训练循环"""
+        print("开始训练...")
+
+        print("save_path:", save_path)
+        assert save_path is not None, "save_path 不能为空！"
+
+        print("self.log_dir:", self.log_dir)
+
+        # 根据 save_path 设置 tensorboard 日志目录
+        if save_path:
+            log_dir = os.path.join(save_path, self.log_dir, datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
+        else:
+            log_dir = self.log_dir or "logs"
+        self.writer = SummaryWriter(log_dir=log_dir)
+
+        for epoch in range(self.start_epoch, num_epochs):
+            train_loss1, train_loss2 = self.train_epoch(epoch)
+            val_loss1, val_loss2 = self.validate(epoch)
+
+            # 展示显存占用
+            # print(torch.cuda.memory_summary())
+
+            # 更新学习率
+            self.scheduler.step()
+
+            # # 打印进度
+            # if val_loss1 is not None:
+            #     print(f"Epoch {epoch+1}/{num_epochs} | "
+            #           f"Train Loss1: {train_loss1:.4f} | "
+            #           f"Val Loss1: {val_loss1:.4f} | "
+            #           f"Train Loss2: {train_loss2:.4f} | "
+            #           f"Val Loss2: {val_loss2:.4f} | "
+            #           f"LR: {self.optimizer.param_groups[0]['lr']:.6f}")
+            # else:
+            #     print(f"Epoch {epoch+1}/{num_epochs} | "
+            #           f"Train Loss1: {train_loss1:.4f} | "
+            #           f"Train Loss2: {train_loss2:.4f} | "
+            #           f"LR: {self.optimizer.param_groups[0]['lr']:.6f}")
+            
+            # 用 tqdm.write 保证输出不会被进度条覆盖
+            if val_loss1 is not None:
+                tqdm.write(f"Epoch {epoch+1}/{num_epochs} | "
+                           f"Train Loss1: {train_loss1:.4f} | "
+                           f"Val Loss1: {val_loss1:.4f} | "
+                           f"Train Loss2: {train_loss2:.4f} | "
+                           f"Val Loss2: {val_loss2:.4f} | "
+                           f"LR: {self.optimizer.param_groups[0]['lr']:.6f}")
+            else:
+                tqdm.write(f"Epoch {epoch+1}/{num_epochs} | "
+                           f"Train Loss1: {train_loss1:.4f} | "
+                           f"Train Loss2: {train_loss2:.4f} | "
+                           f"LR: {self.optimizer.param_groups[0]['lr']:.6f}")
+
+            # 记录到 tensorboard
+            self.writer.add_scalar('Loss1/train', train_loss1, epoch)
+            self.writer.add_scalar('Loss2/train', train_loss2, epoch)
+            if val_loss1 is not None:
+                self.writer.add_scalar('Loss1/val', val_loss1, epoch)
+            if val_loss2 is not None:
+                self.writer.add_scalar('Loss2/val', val_loss2, epoch)   
+            self.writer.add_scalar('LearningRate', self.optimizer.param_groups[0]['lr'], epoch)
+
+            self.writer.flush()
+
+            # 保存模型
+            if save_path:
+                if not os.path.exists(save_path):
+                    os.makedirs(save_path)
+                self.save_model(os.path.join(save_path, f"epoch_{epoch+1}.pth"), epoch)
+
+        if save_path:
+            self.save_model(os.path.join(save_path, f"final.pth"), epoch)
+
+        self.writer.close() # 关闭tensorboard writer
+
+        print("训练完成！")
+
+
+class CrystalSystemClassificationRegressionTrainer(DoubleAimContrastiveLearningTrainer):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # 增加多目标任务的历史记录
+        self.history['train_loss1'] = []
+        self.history['train_loss2'] = []
+        self.history['val_loss1'] = []
+        self.history['val_loss2'] = []
+    def train_epoch(self, epoch) -> float:
+
+        # 记录当前epoch
+        print("当前epoch:", epoch)
+        # 如果epoch是0，跳过当前epoch的训练
+        if epoch == 0:
+            print("跳过epoch 0的训练")
+            return 0, 0
+
+        """训练一个epoch"""
+        self.model.train()
+        total_loss = 0
+        total_loss1 = 0
+        total_loss2 = 0
+        batch_count = 0
+        correct = 0
+        total = 0
+
+        progress_bar = tqdm(self.train_loader, desc=f'Epoch {epoch+1}')
+        for batch_idx, batch in enumerate(progress_bar):
+            # peaks_x, peaks_y, peaks_mask = batch['peaks_x'], batch['peaks_y'], batch['peaks_mask']
+            # labels = batch['labels'].to(self.device, dtype=torch.long)  # 分类任务用long
+            # peaks_x = peaks_x.to(self.device, dtype=self.dtype)
+            # peaks_y = peaks_y.to(self.device, dtype=self.dtype)
+            # peaks_mask = peaks_mask.to(self.device)
+
+            # # 前向传播
+            # logits = self.model(peaks_x, peaks_y, peaks_mask)  # [batch, 7]
+
+
+            peaks_x, peaks_y, peaks_mask = batch['peaks_x'], batch['peaks_y'], batch['peaks_mask']
+            formula, formula_mask = batch['formula'], batch['formula_mask']
+            lattice_parameter = batch['lattice_parameter']
+            space_group = batch['space_group']
+            bandgap = batch['bandgap']
+            crystal_system = batch['crystal_system']
+            density = batch['density']
+            
+            # 选择预测任务
+            labels1 = crystal_system.to(self.device, dtype=torch.long) # 分类任务用long。作为对比，单精度预测使用 self.dtype
+            labels2 = lattice_parameter.to(self.device, dtype=self.dtype)  # 回归任务用float32或float64，和模型参数一致
+
+            # 统一 device
+            peaks_x = peaks_x.to(self.device, dtype=self.dtype)
+            peaks_y = peaks_y.to(self.device, dtype=self.dtype)
+            peaks_mask = peaks_mask.to(self.device)
+            formula, formula_mask = formula.to(self.device), formula_mask.to(self.device)
+            lattice_parameter = lattice_parameter.to(self.device, dtype=self.dtype)
+            space_group = space_group.to(self.device, dtype=torch.long)
+            bandgap = bandgap.to(self.device, dtype=self.dtype)
+            density = density.to(self.device, dtype=self.dtype)
+
+            # 前向传播
+            logits1, logits2 = self.model(peaks_x, peaks_y, peaks_mask, formula, formula_mask,
+                                space_group, bandgap, density)
+
+            # 计算loss1
+            loss_fn1 = torch.nn.CrossEntropyLoss()
+            loss1 = loss_fn1(logits1, labels1)
+            
+            # 计算loss2
+            loss_fn2 = torch.nn.L1Loss()
+            loss2 = loss_fn2(logits2.squeeze(1), labels2) # squeeze(1)把多余的维度挤掉，变成(batch,)
+             
+            # 总loss
+            loss = loss1 + loss2
+            
+            # 反向传播
+            self.optimizer.zero_grad()
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
+            self.optimizer.step()
+
+            # 记录每个batch的loss到tensorboard
+            if self.writer is not None:
+                self.writer.add_scalar('Loss1/batch', loss1.item(), epoch * len(self.train_loader) + batch_idx)
+                self.writer.add_scalar('Loss2/batch', loss2.item(), epoch * len(self.train_loader) + batch_idx)
+                self.writer.add_scalar('Loss2/batch', loss.item(), epoch * len(self.train_loader) + batch_idx)
+
+            batch_count += 1
+            total_loss1 += loss1.item() # 累计损失。语法：loss.item()代表获取loss的数值
+            total_loss2 += loss2.item()
+            total_loss += loss.item()
+            
+            # 统计准确率
+            preds = logits1.argmax(dim=1)
+            correct += (preds == labels1).sum().item()
+            total += labels1.size(0)
+
+        avg_loss1 = total_loss1 / batch_count
+        avg_loss2 = total_loss2 / batch_count
+        acc = correct / total if total > 0 else 0
+        self.history['train_loss1'].append(avg_loss1)
+        self.history['train_loss2'].append(avg_loss2)
+        self.history['learning_rate'].append(self.optimizer.param_groups[0]['lr'])
+        print(f"Train Accuracy: {acc:.4f}")
+        return avg_loss1, avg_loss2
+
+    @torch.no_grad()
+    def validate(self, epoch) -> Optional[float]:
+        """验证"""
+        if self.val_loader is None:
+            return None
+
+        self.model.eval()
+        total_loss1 = 0
+        total_loss2 = 0
+        batch_count = 0
+        correct = 0
+        total = 0
+        mae_sum = 0
+
+        for batch_idx, batch in enumerate(self.val_loader):
+            peaks_x, peaks_y, peaks_mask = batch['peaks_x'], batch['peaks_y'], batch['peaks_mask']
+            formula, formula_mask = batch['formula'], batch['formula_mask']
+            lattice_parameter = batch['lattice_parameter']
+            space_group = batch['space_group']
+            bandgap = batch['bandgap']
+            crystal_system = batch['crystal_system']
+            density = batch['density']
+
+            labels1 = crystal_system.to(self.device, dtype=torch.long)
+            labels2 = lattice_parameter.to(self.device, dtype=self.dtype)
+
+            peaks_x = peaks_x.to(self.device, dtype=self.dtype)
+            peaks_y = peaks_y.to(self.device, dtype=self.dtype)
+            peaks_mask = peaks_mask.to(self.device)
+            formula, formula_mask = formula.to(self.device), formula_mask.to(self.device)
+            space_group = space_group.to(self.device, dtype=torch.long)
+            bandgap = bandgap.to(self.device, dtype=self.dtype)
+            density = density.to(self.device, dtype=self.dtype)
+
+            # 前向传播
+            logits1, logits2 = self.model(peaks_x, peaks_y, peaks_mask, formula, formula_mask,
+                                        space_group, bandgap, density)
+
+            # 分类 loss
+            loss_fn1 = torch.nn.CrossEntropyLoss()
+            loss1 = loss_fn1(logits1, labels1)
+
+            # 回归 loss
+            loss_fn2 = torch.nn.L1Loss()
+            loss2 = loss_fn2(logits2.squeeze(1), labels2)
+
+            total_loss1 += loss1.item()
+            total_loss2 += loss2.item()
+            batch_count += 1
+
+            # 分类准确率
+            preds = logits1.argmax(dim=1)
+            correct += (preds == labels1).sum().item()
+            total += labels1.size(0)
+
+            # 回归 MAE
+            mae_sum += torch.abs(logits2.squeeze(1) - labels2).mean().item()
+
+            # tensorboard
+            if self.writer is not None:
+                self.writer.add_scalar('Loss1/batch_val', loss1.item(), epoch * len(self.val_loader) + batch_idx)
+                self.writer.add_scalar('Loss2/batch_val', loss2.item(), epoch * len(self.val_loader) + batch_idx)
+                self.writer.add_scalar('MAE/batch_val', torch.abs(logits2.squeeze(1) - labels2).mean().item(), epoch * len(self.val_loader) + batch_idx)
+
+        avg_loss1 = total_loss1 / batch_count
+        avg_loss2 = total_loss2 / batch_count
+        acc = correct / total if total > 0 else 0
+        avg_mae = mae_sum / batch_count
+
+        self.history['val_loss1'].append(avg_loss1)
+        self.history['val_loss2'].append(avg_loss2)
+
+        print(f"Val Accuracy: {acc:.4f}, Val MAE: {avg_mae:.4f}")
+
+        if self.writer is not None:
+            self.writer.add_scalar('Accuracy/val', acc, epoch)
+            self.writer.add_scalar('MAE/val', avg_mae, epoch)
+
+        # 返回总 loss（可选，也可以返回 avg_loss1 + avg_loss2）
+        return avg_loss1, avg_loss2
+
+
+
+
 class RegressionTrainer(ContrastiveLearningTrainer):
     def train_epoch(self, epoch) -> float:
         """训练一个epoch"""
@@ -249,7 +519,7 @@ class RegressionTrainer(ContrastiveLearningTrainer):
 
             # 计算loss
             loss_fn = torch.nn.L1Loss()
-            loss = loss_fn(logits.squeeze(1), labels)
+            loss = loss_fn(logits.squeeze(1), labels) # squeeze(1)把多余的维度挤掉，变成(batch,)
 
             # 反向传播
             self.optimizer.zero_grad()
