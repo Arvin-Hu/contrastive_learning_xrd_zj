@@ -17,7 +17,7 @@ if __name__ == '__main__':
     model.load_state_dict(torch.load(filename)['model_state_dict'])
     model.eval()  
     
-    device = 'cuda:2' if torch.cuda.is_available() else 'cpu'
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
     model.to(device)
     dtype = next(model.parameters()).dtype
     

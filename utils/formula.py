@@ -35,7 +35,6 @@ class ElementEncoder:
         # 正则表达式匹配元素符号（大写字母+可选小写字母）
         pattern = r'[A-Z][a-z]?'
         elements = re.findall(pattern, formula)
-
         # 去重并保持顺序
         unique_elements = []
         for element in elements:
@@ -128,13 +127,11 @@ class ElementEncoder:
             elements = self.extract_elements(formula)
         elif not elements:
             raise ValueError("必须提供elements或formula参数")
-
         # 创建onehot编码
         encoding = [0] * len(self.all_elements)
         for element in elements:
             if element in self.element_to_code:
                 encoding[self.element_to_code[element]] = 1
-
         return encoding
 
 

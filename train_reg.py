@@ -1,7 +1,14 @@
 import numpy as np
+<<<<<<< HEAD
 from models.reg_model import XRDRegressionModel
 from trainer import RegressionTrainer
 from dataset.reg_dataset import XRDDataset, collate_fn
+=======
+from models.reg_model import XRDRegressionModel, XRDConvRegressionModel, XRDFormulaModel
+from trainer import RegressionTrainer, FormationEnergyTrainer
+from dataset.reg_dataset import XRDDataset, collate_fn
+from dataset.xrd_dataset import XRDFullDataset, xrd_collate_fn
+>>>>>>> yyh
 import torch
 from torch.utils.data import DataLoader
 
@@ -16,25 +23,43 @@ def train(
     num_layers=6,
     model_path=None,
     train_path=None,
-    eval_path=None
+    eval_path=None,
+    model_class='XRDFormulaModel',
+    trainer_class='RegressionTrainer'
 ):
 
     # 3. 创建数据集和数据加载器
-    train_dataset = XRDDataset(
+    train_dataset = XRDFullDataset(
         xrd_path='/mnt/minio/battery/xrd/datasets/raw_data/mp_xrd',
         json_path=train_path, label_to_extract="formation_energy"
     )
-    eval_dataset = XRDDataset(
+    eval_dataset = XRDFullDataset(
         xrd_path='/mnt/minio/battery/xrd/datasets/raw_data/mp_xrd',
         json_path=eval_path, label_to_extract="formation_energy"
     )
+<<<<<<< HEAD
     train_loader = DataLoader(train_dataset, batch_size=batch_size, num_workers=8, pin_memory=True, shuffle=True, collate_fn=collate_fn)
     eval_loader = DataLoader(eval_dataset, batch_size=batch_size, shuffle=True, pin_memory=True, collate_fn=collate_fn)
 
+=======
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, num_workers=8, pin_memory=True, shuffle=True, collate_fn=xrd_collate_fn)
+    eval_loader = DataLoader(eval_dataset, batch_size=batch_size, shuffle=True, pin_memory=True, collate_fn=xrd_collate_fn)
+    
+>>>>>>> yyh
     # 4. 初始化模型
-    model = XRDRegressionModel(
-        embedding_dim=embedding_dim,
-    )
+    if model_class == 'XRDConvRegressionModel':
+        model = XRDConvRegressionModel(
+            embedding_dim=embedding_dim,
+        )
+    elif model_class == 'XRDFormulaModel':
+        model = XRDFormulaModel(
+            embedding_dim=embedding_dim,
+        )
+    elif model_class == 'XRDRegressionModel':
+        model = XRDRegressionModel(
+            embedding_dim=embedding_dim,
+        )
+
     model = model.to(dtype=torch.float32)
 
     print(f"可训练参数: {sum(p.numel() for p in model.parameters() if p.requires_grad)}")
@@ -44,13 +69,23 @@ def train(
 
 
     # 5. 创建训练器并训练
-    trainer = RegressionTrainer(
-        model=model,
-        train_loader=train_loader,
-        val_loader=eval_loader,
-        learning_rate=learning_rate,
-        weight_decay=weight_decay,
-    )
+    if trainer_class == 'FormationEnergyTrainer':
+        trainer = FormationEnergyTrainer(
+            model=model,
+            train_loader=train_loader,
+            val_loader=eval_loader,
+            learning_rate=learning_rate,
+            weight_decay=weight_decay,
+        )
+    elif trainer_class == 'RegressionTrainer':
+        trainer = RegressionTrainer(
+            model=model,
+            train_loader=train_loader,
+            val_loader=eval_loader,
+            learning_rate=learning_rate,
+            weight_decay=weight_decay,
+        )
+    
     if model_path:
         trainer.load_model(model_path)
 
@@ -80,9 +115,16 @@ if __name__ == '__main__':
     parser.add_argument('--model_path', type=str, default=None)
     parser.add_argument('--train_path', type=str, default=None)
     parser.add_argument('--eval_path', type=str, default=None)
+<<<<<<< HEAD
     parser.add_argument('--label_to_extract', type=str, default="formation_energy")
 
     # 3. 从命令行中结构化解析参数
+=======
+    parser.add_argument('--model_class', type=str, default='XRDFormulaModel')
+    parser.add_argument('--trainer_class', type=str, default='FormationEnergyTrainer')
+    
+    # 3. 从命令行中结构化解析参数 
+>>>>>>> yyh
     args = parser.parse_args()
     print(args)
     # epochs = args.epochs

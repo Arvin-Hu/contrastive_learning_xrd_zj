@@ -6,3 +6,7 @@ wandb/**
 *.faiss
 *.log
 /runs/*
+
+
+# yayun's gitignore
+yyh
