@@ -223,14 +223,18 @@ class PeakTokenizer(nn.Module):
             nn.ReLU(True),
             nn.Linear(embedding_dim, embedding_dim),
         )
-        self.vnode_encoder = nn.Embedding(1, embedding_dim)
-        self.cls_token_param = nn.Parameter(torch.zeros(1, 1, embedding_dim))
+        self.vnode_encoder = nn.Embedding(1, embedding_dim) # 一个无实际用途的嵌入层，仅用于参数初始化（可忽略）。
+        self.cls_token_param = nn.Parameter(torch.zeros(1, 1, embedding_dim)) # 一个可学习的参数，shape 为 [1, 1, embedding_dim]，作为“CLS token”，用于全局特征聚合。 在自然语言处理中，tokenizer通常会添加以下特殊标记,通常称为：[CLS]、<s>、<bos>、[BOS]、<start>
    
     def forward(self, x: torch.Tensor, y: torch.Tensor, mask: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:  
         batch_size = x.shape[0]
         tokens = self.embed_tokens_and_positions(torch.stack([x, y], dim=-1))
-        cls_tokens = self.cls_token_param.expand(batch_size, -1, -1)
-        tokens = torch.cat([cls_tokens, tokens], dim=1)  
+        cls_tokens = self.cls_token_param.expand(batch_size, -1, -1) # 形状为 [batch_size, 1, embedding_dim], 将第一维扩展为 batch_size。另外两维度不变。
+        # self.cls_token_param 是一个 nn.Parameter，比如 shape [1, 1, embedding_dim]，它是模型的可训练参数。
+        # expand(batch_size, -1, -1) 只是创建一个新的视图，让这个参数在 batch 维上“看起来”变成 [batch_size, 1, embedding_dim]，但底层数据还是同一块内存、同一组参数。
+        # 梯度和参数更新只针对原始的 self.cls_token_param，不会因为 expand 而复制或增加参数。
+        # 可训练参数量不会变化，始终是 1 * 1 * embedding_dim。
+        tokens = torch.cat([cls_tokens, tokens], dim=1)  # 形状为 [batch_size, peak_max_len + 1, embedding_dim]
         cls_mask = torch.zeros(batch_size, 1).to(mask.device, dtype=mask.dtype)
         mask = torch.cat([cls_mask, mask], dim=1)
         return tokens, mask

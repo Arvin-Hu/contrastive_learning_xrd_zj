@@ -25,19 +25,14 @@ torchrun --nproc_per_node=${NPROC_PER_NODE} \
          --batch_size 1024 \
          --embedding_dim 256 \
          --log_dir runs/crystal_system_logs \
-         --output_path /home/perm/workspace/data/mnt/minio/battery/xrd/train_outputs/xrd/crystal_system/v3_full \
-         --train_path /mnt/minio/battery/xrd/datasets/MP_xrd-train.jsonl  \
-         --eval_path /mnt/minio/battery/xrd/datasets/MP_xrd-test.jsonl \
+         --output_path /home/perm/workspace/data/mnt/minio/battery/xrd/train_outputs/xrd/crystal_system/v5_full \
+         --train_path /mnt/minio/battery/xrd/datasets/MP_xrd_train_with_density.jsonl  \
+         --eval_path /mnt/minio/battery/xrd/datasets/MP_xrd_test_with_density.jsonl \
          --trainer_class CrystalSystemClassificationTrainer \
-         --model_class XRDFormulaClassificationModel \
-         --model_path /home/perm/workspace/data/mnt/minio/battery/xrd/train_outputs/xrd/crystal_system/v3_full/epoch_40.pth
+         --model_class XRDFormulaClassificationModel 
+        #  --model_path /home/perm/workspace/data/mnt/minio/battery/xrd/train_outputs/xrd/crystal_system/v3_full/epoch_40.pth
 
 
 # --model_path /home/perm/workspace/data/mnt/minio/battery/xrd/train_outputs/xrd/crystal_system/epoch_1.pth
 
 # /mnt/minio/battery/xrd/train_outputs/xrd/formation_energy/yyh          
- 
-         
-        
-         
-         

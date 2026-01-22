@@ -89,7 +89,7 @@ class XRDFormulaClassificationModel(nn.Module):
                  num_heads: int = 8,
                  num_layers: int = 6,
                  dropout: float = 0.0,
-                 formula_vocab_size: int = 118,
+                 formula_vocab_size: int = 118, # 假设有118种元素
                  num_classes: int = 7
                  ):
         super().__init__()
@@ -105,10 +105,12 @@ class XRDFormulaClassificationModel(nn.Module):
         )
         self.transformer = nn.TransformerEncoder(encoder_layer, num_layers)
         
-        self.formula_embedding = nn.Embedding(formula_vocab_size, embedding_dim)
-        
+        self.formula_embedding = nn.Embedding(formula_vocab_size, embedding_dim) # nn.Embedding需要训练
+
+
+        # [batch_size, {peak_max_len + formula_max_len}, embedding_dim]
         self.mlp = nn.Sequential(
-            nn.Linear(2 * embedding_dim + 8, 64), #  + 8 = 6(lattice) + 1(space_group) + 1(bandgap)
+            nn.Linear(2 * embedding_dim + 9, 64), #  + 9 = 6(lattice) + 1(space_group) + 1(bandgap) + 1(density)
             nn.BatchNorm1d(64),
             nn.ReLU(),
             nn.Linear(64, 32),
@@ -130,7 +132,7 @@ class XRDFormulaClassificationModel(nn.Module):
                 nn.init.ones_(m.weight)
                 nn.init.zeros_(m.bias)
 
-    def forward(self, peaks_x: torch.Tensor, peaks_y: torch.Tensor, peaks_mask: torch.Tensor, formula: torch.Tensor, formula_mask: torch.Tensor, lattice_parameter: torch.Tensor, space_group: torch.Tensor, bandgap: torch.Tensor) -> torch.Tensor:
+    def forward(self, peaks_x: torch.Tensor, peaks_y: torch.Tensor, peaks_mask: torch.Tensor, formula: torch.Tensor, formula_mask: torch.Tensor, lattice_parameter: torch.Tensor, space_group: torch.Tensor, bandgap: torch.Tensor, density: torch.Tensor) -> torch.Tensor:
         """
         前向传播
         Args:
@@ -139,27 +141,32 @@ class XRDFormulaClassificationModel(nn.Module):
             peaks_mask: XRD输入数据的掩码 [batch_size, seq_len]
             formula: 化学式 [batch_size, formula_seq_len]
             formula_mask: 化学式掩码 [batch_size, formula_seq_len]
+            lattice_parameter: 晶格参数 [batch_size, 6]
+            space_group: 空间群 [batch_size]
+            bandgap: 能带隙 [batch_size]
+            density: 密度 [batch_size]
         Returns:
             logits: 预测类别 [batch_size, num_classes]
         """
-        xrd_seq, xrd_mask = self.xrd_encoder(peaks_x, peaks_y, peaks_mask)
-        xrd_embedding = self.transformer(xrd_seq, src_key_padding_mask=xrd_mask)
-        xrd_embedding = xrd_embedding[:, 0, :]  # 取CLS或第一个token
+        xrd_seq, xrd_mask = self.xrd_encoder(peaks_x, peaks_y, peaks_mask) # 形状为 [batch_size, peak_max_len+1, embedding_dim]
+        xrd_embedding = self.transformer(xrd_seq, src_key_padding_mask=xrd_mask) # 形状为 [batch_size, peak_max_len+1, embedding_dim]
+        xrd_embedding = xrd_embedding[:, 0, :]  # 取CLS或第一个token。丢了其它token的信息。形状为 [batch_size, embedding_dim]
 
         formula_embedding = self.formula_embedding(formula)
         emb_dim = formula_embedding.shape[-1]
         formula_mask = torch.logical_not(formula_mask.unsqueeze(-1).repeat(1, 1, emb_dim)).to(formula_embedding.dtype)
         formula_embedding = torch.mul(formula_embedding, formula_mask)
-        formula_embedding = torch.sum(formula_embedding, dim=1)
+        formula_embedding = torch.sum(formula_embedding, dim=1) # 形状为 [batch_size, emb_dim]
         
         # 处理这三个特征
         # 假设 space_group, bandgap 都是一维 [batch]
         # lattice_parameter: [batch, 6]
         extra_features = torch.cat([
             lattice_parameter,  # [batch, 6]
-            space_group.unsqueeze(1),        # [batch, 1]
-            bandgap.unsqueeze(1)             # [batch, 1]
-        ], dim=1)  # [batch, 8]
+            space_group.unsqueeze(1),        # [batch, 1]。会把 shape 从 [batch] 变成 [batch, 1]，即每个样本的类别编号变成一列
+            bandgap.unsqueeze(1),           # [batch, 1]
+            density.unsqueeze(1)            # [batch, 1]
+        ], dim=1)  # [batch, 9]
 
         # embedding = torch.cat([xrd_embedding, formula_embedding], dim=-1)
         # 拼接到 embedding
